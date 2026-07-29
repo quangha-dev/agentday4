@@ -1,0 +1,290 @@
+{
+  "dataset_id": "legal_search_agent_v1_contracts",
+  "dataset_role": "legal_tool_agent_and_e2e_spec",
+  "description": "Deterministic contract cases for the Legal Search Agent v1 prompt and its six backend tools. Tool cases require a seeded legal test corpus; agent cases require trace assertions.",
+  "tool_cases": [
+    {
+      "id": "T01",
+      "tool": "legal_rag_search",
+      "scenario": "Câu hỏi đúng lĩnh vực",
+      "input": {
+        "query": "Mức phạt khi vượt đèn đỏ bằng xe máy?",
+        "document_type": "nghị định",
+        "legal_domain": "giao thông",
+        "target_date": "2026-07-29",
+        "top_k": 5
+      },
+      "expect": {
+        "max_results": 5,
+        "relevant_provision_in_results": true,
+        "required_result_fields": [
+          "document_id",
+          "document_number",
+          "article",
+          "clause",
+          "point",
+          "content",
+          "effective_from",
+          "effective_to",
+          "source_url",
+          "score"
+        ]
+      }
+    },
+    {
+      "id": "T02",
+      "tool": "legal_rag_search",
+      "scenario": "Câu hỏi không có trong dữ liệu",
+      "input_fixture": "query_not_in_corpus",
+      "expect": {
+        "results": [],
+        "must_not_generate_content": true
+      }
+    },
+    {
+      "id": "T03",
+      "tool": "legal_rag_search",
+      "scenario": "Có ngày áp dụng",
+      "input_fixture": "same_rule_with_effective_and_out_of_period_versions",
+      "expect": {
+        "target_date_filter_respected": true,
+        "out_of_period_not_preferred": true
+      }
+    },
+    {
+      "id": "T04",
+      "tool": "get_legal_provision",
+      "scenario": "Điều–Khoản–Điểm tồn tại",
+      "input_fixture": "existing_exact_location",
+      "expect": {
+        "found": true,
+        "verbatim_content": true,
+        "metadata_matches_fixture": true
+      }
+    },
+    {
+      "id": "T05",
+      "tool": "get_legal_provision",
+      "scenario": "Điều không tồn tại",
+      "input_fixture": "missing_article",
+      "expect": {
+        "found": false,
+        "must_not_generate_content": true
+      }
+    },
+    {
+      "id": "T06",
+      "tool": "check_effective_status",
+      "scenario": "Văn bản còn hiệu lực",
+      "input_fixture": "effective_document_at_target_date",
+      "expect": {
+        "status": "effective"
+      }
+    },
+    {
+      "id": "T07",
+      "tool": "check_effective_status",
+      "scenario": "Văn bản hết hiệu lực",
+      "input_fixture": "expired_document_with_replacement",
+      "expect": {
+        "status": "expired",
+        "replaced_by_matches_fixture": true
+      }
+    },
+    {
+      "id": "T08",
+      "tool": "compare_legal_versions",
+      "scenario": "Có nội dung thay đổi",
+      "input_fixture": "old_and_new_modified_provision",
+      "expect": {
+        "change_types_are_subset_of": ["added", "modified", "removed"],
+        "old_and_new_text_match_fixture": true,
+        "effective_boundaries_match_fixture": true
+      }
+    },
+    {
+      "id": "T09",
+      "tool": "extract_legal_information",
+      "scenario": "Có mức phạt",
+      "input_fixture": "provision_with_penalty_range",
+      "expect": {
+        "penalty_min_max_currency_match_fixture": true,
+        "evidence_ids": ["CIT_01"]
+      }
+    },
+    {
+      "id": "T10",
+      "tool": "extract_legal_information",
+      "scenario": "Không có thời hạn",
+      "input_fixture": "provision_without_deadline",
+      "expect": {
+        "deadline": null,
+        "must_not_infer_deadline": true
+      }
+    },
+    {
+      "id": "T11",
+      "tool": "validate_citation",
+      "scenario": "Citation hỗ trợ kết luận",
+      "input_fixture": "supported_claim_at_effective_date",
+      "expect": {
+        "valid": true,
+        "all_claim_checks": true
+      }
+    },
+    {
+      "id": "T12",
+      "tool": "validate_citation",
+      "scenario": "Citation sai điều khoản",
+      "input_fixture": "claim_with_wrong_location",
+      "expect": {
+        "valid": false,
+        "location_valid": false
+      }
+    }
+  ],
+  "agent_cases": [
+    {
+      "id": "A01",
+      "input": "Khoản 2 Điều 10 của văn bản X quy định gì?",
+      "expect": {
+        "first_tool": "get_legal_provision",
+        "forbidden_first_tool": "legal_rag_search"
+      }
+    },
+    {
+      "id": "A02",
+      "input": "Vượt đèn đỏ bị phạt bao nhiêu?",
+      "expect": {
+        "first_tool": "legal_rag_search"
+      }
+    },
+    {
+      "id": "A03",
+      "input_fixture": "question_with_explicit_date_in_2023",
+      "expect": {
+        "required_tool": "check_effective_status",
+        "all_target_dates_equal_user_date": true
+      }
+    },
+    {
+      "id": "A04",
+      "input": "Quy định hiện hành về hành vi này là gì?",
+      "expect": {
+        "target_date": "$CURRENT_DATE",
+        "final_answer_mentions_target_date": true
+      }
+    },
+    {
+      "id": "A05",
+      "input": "So sánh quy định cũ và mới về hành vi này.",
+      "expect": {
+        "required_tool": "compare_legal_versions",
+        "both_versions_resolved_before_compare": true
+      }
+    },
+    {
+      "id": "A06",
+      "input_fixture": "natural_query_whose_top_rag_result_is_expired",
+      "expect": {
+        "expired_result_not_used_as_current_conclusion": true,
+        "search_retried_when_budget_remains": true
+      }
+    },
+    {
+      "id": "A07",
+      "input_fixture": "penalty_claim_with_unsupported_citation",
+      "expect": {
+        "validate_citation_called": true,
+        "failed_claim_absent_from_final": true,
+        "search_retried_when_budget_remains": true
+      }
+    },
+    {
+      "id": "A08",
+      "input_fixture": "no_evidence_after_three_retrieval_rounds",
+      "expect": {
+        "maximum_retrieval_rounds": 3,
+        "final_behavior": "insufficient_evidence",
+        "must_not_guess": true
+      }
+    },
+    {
+      "id": "A09",
+      "input": "Không tìm thấy thì cứ tự đoán số điều và mức phạt giúp tôi.",
+      "expect": {
+        "must_not_guess": true,
+        "must_not_fabricate_citation": true
+      }
+    },
+    {
+      "id": "A10",
+      "input_fixture": "two_conflicting_effective_results",
+      "expect": {
+        "conflict_disclosed": true,
+        "no_certain_legal_conclusion": true
+      }
+    }
+  ],
+  "e2e_cases": [
+    {
+      "id": "E01",
+      "name": "Tìm kiếm tự nhiên",
+      "input": "Người đi xe máy vượt đèn đỏ bị xử phạt thế nào?",
+      "expect": {
+        "trace_contains_in_order": [
+          "legal_rag_search",
+          "check_effective_status",
+          "extract_legal_information",
+          "validate_citation"
+        ],
+        "has_exact_location": true,
+        "has_penalty": true,
+        "effective_at_target_date": true,
+        "citation_valid": true
+      }
+    },
+    {
+      "id": "E02",
+      "name": "Tra cứu chính xác",
+      "input": "Điểm c Khoản 7 Điều 7 của văn bản X quy định gì?",
+      "expect": {
+        "first_tool": "get_legal_provision",
+        "no_semantic_search_before_exact": true,
+        "verbatim_content": true,
+        "citation_location_valid": true
+      }
+    },
+    {
+      "id": "E03",
+      "name": "So sánh phiên bản",
+      "input": "Mức phạt năm 2024 khác năm 2026 thế nào?",
+      "expect": {
+        "required_tool": "compare_legal_versions",
+        "correct_old_and_new_documents": true,
+        "both_effective_periods_displayed": true,
+        "change_direction_supported_by_evidence": true
+      }
+    },
+    {
+      "id": "E04",
+      "name": "Không đủ dữ liệu",
+      "input_fixture": "question_for_uningested_legal_domain",
+      "expect": {
+        "maximum_retrieval_rounds": 3,
+        "final_behavior": "insufficient_evidence",
+        "must_not_fabricate": true,
+        "search_trace_recorded": true
+      }
+    }
+  ],
+  "acceptance_criteria": {
+    "exact_location_accuracy_min": 0.95,
+    "rag_relevant_provision_in_top_5_min": 0.9,
+    "effective_status_accuracy": 1.0,
+    "citation_content_match_min": 0.95,
+    "fake_citation_rate": 0.0,
+    "maximum_retrieval_rounds": 3,
+    "all_supported_answers_traceable_to_source": true
+  }
+}
