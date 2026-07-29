@@ -1,17 +1,17 @@
-import unittest
+from __future__ import annotations
+
 import json
 import sys
 import unittest
 from pathlib import Path
 
+# Tự động thêm thư mục starter_v0 vào sys.path để hỗ trợ chạy trực tiếp từ terminal
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools import TOOL_FUNCTIONS, load_tool_declarations
 
-
-ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_FAILURE_TYPES = {
     "wrong_tool", "wrong_arg_value", "wrong_boundary", "unnecessary_tool",
     "out_of_scope", "missing_info",
