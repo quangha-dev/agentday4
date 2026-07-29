@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "active_version": "v3",
+  "evidence_policy": "Offline tests are not substitutes for live provider run JSON.",
+  "versions": [
+    {
+      "version": "v0",
+      "stage": "baseline",
+      "prompt_file": "artifacts/versions/v0/system_prompt.md",
+      "tools_file": "artifacts/versions/v0/tools.yaml",
+      "known_gaps": [
+        "guesses missing handle and URL",
+        "no confirmation before external write",
+        "forces one tool only",
+        "no prompt-injection boundary"
+      ],
+      "hypothesis": "Measure intentionally weak starter behavior before any fix.",
+      "live_result": "pending_provider_run"
+    },
+    {
+      "version": "v1",
+      "stage": "routing_fix_with_known_security_gaps",
+      "prompt_file": "artifacts/versions/v1/system_prompt.md",
+      "tools_file": "artifacts/versions/v1/tools.yaml",
+      "known_gaps": [
+        "security depends mostly on model instruction",
+        "no deterministic Unicode-aware guard",
+        "tool outputs are not centrally sanitized",
+        "argument validation is incomplete"
+      ],
+      "hypothesis": "Explicit intent routing and argument conventions improve base accuracy.",
+      "live_result": "pending_provider_run"
+    },
+    {
+      "version": "v2",
+      "stage": "defense_in_depth",
+      "prompt_file": "artifacts/versions/v2/system_prompt.md",
+      "tools_file": "artifacts/tools.yaml",
+      "known_gaps": [
+        "pattern detection cannot prove arbitrary semantic safety",
+        "live-model false-positive rate still requires measurement"
+      ],
+      "hypothesis": "An orchestration guard plus untrusted-result boundaries blocks common injection without adding grader-visible tool calls.",
+      "live_result": "pending_provider_run"
+    },
+    {
+      "version": "v3",
+      "stage": "final_candidate",
+      "prompt_file": "artifacts/system_prompt.md",
+      "tools_file": "artifacts/tools.yaml",
+      "known_gaps": [
+        "requires live provider and tool execution evidence",
+        "no system can guarantee coverage of every future prompt attack"
+      ],
+      "hypothesis": "Complete routing, multi-turn, source, action and injection policies minimize public and hidden-like failures.",
+      "live_result": "pending_provider_run"
+    }
+  ]
+}

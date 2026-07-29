@@ -1,0 +1,88 @@
+tools:
+  - name: clarify
+    description: "Ask for missing required information. Use text for a missing handle/URL and yes_no before an external write."
+    parameters:
+      type: object
+      properties:
+        question: {type: string, default: ""}
+        response_type: {type: string, enum: [text, yes_no, choice], default: "text"}
+        options: {type: array, default: [], items: {type: string}}
+      required: [question]
+  - name: timeline
+    description: "Recent posts FROM one specific account; screenname is the handle without @. Not for topic discussion."
+    parameters:
+      type: object
+      properties:
+        screenname: {type: string, default: ""}
+        limit: {type: integer, default: 5}
+      required: [screenname]
+  - name: social_search
+    description: "Search posts ABOUT a topic across accounts. Top means popular; Latest means recent."
+    parameters:
+      type: object
+      properties:
+        query: {type: string, default: ""}
+        search_type: {type: string, enum: [Latest, Top], default: "Latest"}
+        limit: {type: integer, default: 5}
+      required: [query]
+  - name: lookup
+    description: "Search the public web. Use news for current news; do not use when a concrete URL is supplied."
+    parameters:
+      type: object
+      properties:
+        query: {type: string, default: ""}
+        topic: {type: string, enum: [general, news], default: "general"}
+        timeframe: {type: string, enum: [day, week, month, year], default: "week"}
+        max_results: {type: integer, default: 5}
+      required: [query]
+  - name: fetch
+    description: "Read one concrete URL. Never invent a missing URL."
+    parameters:
+      type: object
+      properties:
+        url: {type: string, default: ""}
+      required: [url]
+  - name: format
+    description: "Format already-collected items; does not fetch."
+    parameters:
+      type: object
+      properties:
+        items: {type: array, default: [], items: {type: object}}
+        template: {type: string, enum: [brief, sections, bullets, thread, daily_ai_vn], default: "sections"}
+        headline: {type: string, default: ""}
+      required: [items, template]
+  - name: send
+    description: "External Telegram write. Use only after explicit confirmation of exact text."
+    parameters:
+      type: object
+      properties:
+        text: {type: string, default: ""}
+        confirmed: {type: boolean, default: false}
+      required: [text]
+  - name: policy
+    description: "Search internal company policy only."
+    parameters:
+      type: object
+      properties:
+        query: {type: string, default: ""}
+        policy_area: {type: string, enum: [all, ai_research, source_citation, data_privacy, external_publishing, tool_usage], default: "all"}
+        top_k: {type: integer, default: 3}
+      required: [query]
+  - name: papers
+    description: "Search arXiv papers by topic."
+    parameters:
+      type: object
+      properties:
+        query: {type: string, default: ""}
+        max_results: {type: integer, default: 5}
+        sort_by: {type: string, enum: [relevance, lastUpdatedDate, submittedDate], default: "relevance"}
+      required: [query]
+  - name: paper_text
+    description: "Extract text from a specific arXiv ID or URL."
+    parameters:
+      type: object
+      properties:
+        arxiv_url: {type: string, default: ""}
+        max_pages: {type: integer, default: 5}
+        max_chars: {type: integer, default: 8000}
+      required: [arxiv_url]
