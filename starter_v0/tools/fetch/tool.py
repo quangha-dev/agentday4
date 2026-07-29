@@ -5,11 +5,15 @@ from typing import Any
 
 import requests
 
+from security import validate_public_http_url
 from tools._shared import TIMEOUT, domain, err
 
 
 def read_url(url: str = "") -> dict[str, Any]:
     try:
+        allowed, reason = validate_public_http_url(url)
+        if not allowed:
+            raise ValueError(f"Unsafe URL rejected: {reason}")
         key = os.getenv("FIRECRAWL_API_KEY")
         if not key:
             raise RuntimeError("Missing FIRECRAWL_API_KEY env var")

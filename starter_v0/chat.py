@@ -10,6 +10,14 @@ from typing import Any
 from env_loader import load_lab_env
 from providers import make_provider
 from providers.base import ToolCall
+from security import (
+    blocked_response,
+    inspect_request,
+    redact_for_logging,
+    redact_secrets,
+    sanitize_tool_result,
+    validate_tool_call,
+)
 from tools import TOOL_FUNCTIONS, load_tool_declarations, to_openai_tools
 from versioning import artifact_version_dict, build_artifact_version
 
@@ -41,7 +49,7 @@ def trim_history(history: list[dict[str, str]], window: int) -> list[dict[str, s
     return history[-window * 2:]
 
 
-def execute_tool_call(call: ToolCall) -> dict[str, Any]:
+def execute_tool_call(call: ToolCall, tools: list[dict[str, Any]]) -> dict[str, Any]:
     func = TOOL_FUNCTIONS.get(call.name)
     if not func:
         return {
@@ -49,11 +57,18 @@ def execute_tool_call(call: ToolCall) -> dict[str, Any]:
             "args": call.args,
             "result": {"error": "unknown_tool", "message": f"No local implementation for {call.name}"},
         }
+    valid, validation_errors = validate_tool_call(call.name, call.args, tools)
+    if not valid:
+        return {
+            "tool": call.name,
+            "args": call.args,
+            "result": {"error": "tool_policy_violation", "details": validation_errors},
+        }
     try:
         result = func(**call.args)
     except Exception as exc:
-        result = {"error": type(exc).__name__, "message": str(exc)}
-    return {"tool": call.name, "args": call.args, "result": result}
+        result = {"error": type(exc).__name__, "message": redact_secrets(str(exc))}
+    return {"tool": call.name, "args": call.args, "result": sanitize_tool_result(result)}
 
 
 def tool_results_message(events: list[dict[str, Any]]) -> dict[str, str]:
@@ -70,7 +85,7 @@ def tool_results_message(events: list[dict[str, Any]]) -> dict[str, str]:
 
 def assistant_tool_message(response_text: str | None, calls: list[ToolCall]) -> dict[str, str]:
     call_summary = [{"name": call.name, "args": call.args} for call in calls]
-    content = response_text or "I will call the selected tool(s)."
+    content = redact_secrets(response_text or "I will call the selected tool(s).")
     return {
         "role": "assistant",
         "content": f"{content}\n\nTOOL_CALLS_JSON:\n{json_text(call_summary)}",
@@ -85,6 +100,22 @@ def run_model_tool_loop(
     model: str | None,
     max_tool_rounds: int,
 ) -> dict[str, Any]:
+    latest_user_text = next(
+        (message.get("content", "") for message in reversed(messages) if message.get("role") == "user"),
+        "",
+    )
+    decision = inspect_request(latest_user_text)
+    security = decision.to_dict()
+    security.pop("normalized_text", None)
+    if not decision.allowed:
+        return {
+            "status": "blocked_by_security",
+            "assistant_text": blocked_response(decision),
+            "rounds": [],
+            "tool_events": [],
+            "security": security,
+        }
+
     working_messages = list(messages)
     rounds: list[dict[str, Any]] = []
     all_tool_events: list[dict[str, Any]] = []
@@ -94,7 +125,7 @@ def run_model_tool_loop(
         calls = response.tool_calls
         round_record: dict[str, Any] = {
             "round": round_index,
-            "assistant_text": response.text,
+            "assistant_text": redact_secrets(response.text or "") or None,
             "tool_calls": [{"name": call.name, "args": call.args} for call in calls],
             "tool_results": [],
         }
@@ -103,9 +134,10 @@ def run_model_tool_loop(
             rounds.append(round_record)
             return {
                 "status": "answered",
-                "assistant_text": response.text or "",
+                "assistant_text": redact_secrets(response.text or ""),
                 "rounds": rounds,
                 "tool_events": all_tool_events,
+                "security": security,
             }
 
         working_messages.append(assistant_tool_message(response.text, calls))
@@ -113,7 +145,7 @@ def run_model_tool_loop(
 
         for call in calls:
             print(f"🔧 {call.name}({json.dumps(call.args, ensure_ascii=False, sort_keys=True)})")
-            event = execute_tool_call(call)
+            event = execute_tool_call(call, tools)
             round_record["tool_results"].append(event)
             all_tool_events.append(event)
 
@@ -128,6 +160,7 @@ def run_model_tool_loop(
                     "assistant_text": question,
                     "rounds": rounds,
                     "tool_events": all_tool_events,
+                    "security": security,
                 }
 
             non_clarification_events.append(event)
@@ -140,13 +173,15 @@ def run_model_tool_loop(
         "assistant_text": f"Stopped after {max_tool_rounds} tool rounds. Inspect the transcript for details.",
         "rounds": rounds,
         "tool_events": all_tool_events,
+        "security": security,
     }
 
 
 def write_transcript(path: Path, transcript: dict[str, Any]) -> None:
     transcript["updated_at"] = now_iso()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    safe_transcript = redact_for_logging(transcript)
+    path.write_text(json.dumps(safe_transcript, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
 
 def main() -> None:
@@ -239,7 +274,7 @@ def main() -> None:
         except Exception as exc:
             turn_record.update({
                 "status": "provider_error",
-                "error": f"{type(exc).__name__}: {str(exc)}",
+                "error": f"{type(exc).__name__}: {redact_secrets(str(exc))}",
             })
             print(f"\nERROR> {turn_record['error']}")
 
