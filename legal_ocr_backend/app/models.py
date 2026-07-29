@@ -70,6 +70,8 @@ class DocumentPage(Base):
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
     page_number: Mapped[int] = mapped_column(Integer)
     classification: Mapped[str] = mapped_column(String(20), default="unknown")
+    ocr_engine: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ocr_languages: Mapped[str | None] = mapped_column(String(100), nullable=True)
     image_path: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)

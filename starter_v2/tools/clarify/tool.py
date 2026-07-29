@@ -5,7 +5,9 @@ from typing import Any
 
 def ask_user(question: str = "", response_type: str = "text", options: list[str] | None = None) -> dict[str, Any]:
     return {
-        "tool": "ask_user",
+        "tool": "clarify",
+        "ok": True,
+        "contract_version": "ver2",
         "question": question,
         "response_type": response_type,
         "options": options or [],

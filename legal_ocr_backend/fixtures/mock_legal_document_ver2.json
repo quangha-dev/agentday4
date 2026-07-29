@@ -1,0 +1,48 @@
+{
+  "dataset_id": "lexflow-mock-legal-ver2-expanded",
+  "metadata": {
+    "title": "Quy chế mẫu về quản trị, bảo vệ và ứng phó sự cố dữ liệu số",
+    "document_number": "MOCK-01/2026/QC-LF",
+    "issued_date": "2026-01-01",
+    "effective_date": "2026-01-15",
+    "document_type": "Quy chế mẫu",
+    "issuing_authority": "LexFlow Test Lab",
+    "signer": "Dữ liệu thử nghiệm",
+    "summary": "Văn bản giả lập nhiều cấp cấu trúc dùng để kiểm thử OCR-independent parser, legal chunking, exact lookup, semantic RAG, hiệu lực và citation; tuyệt đối không có giá trị pháp lý.",
+    "version_number": 1
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "PHẦN I. QUY ĐỊNH CHUNG\nCHƯƠNG I. PHẠM VI, ĐỐI TƯỢNG VÀ NGUYÊN TẮC\nĐIỀU 1. Phạm vi điều chỉnh\n1. Quy chế mẫu này quy định việc thu thập, phân loại, lưu trữ, sử dụng, chia sẻ, sao lưu và tiêu hủy dữ liệu số trong môi trường phát triển và kiểm thử LexFlow.\na) Dữ liệu thử nghiệm phải được gắn nhãn MOCK ngay khi tạo.\nb) Dữ liệu thử nghiệm không được sử dụng làm căn cứ pháp lý hoặc quyết định vận hành thật.\n2. Quy chế quy định trách nhiệm của người tạo dữ liệu, người phê duyệt, người vận hành hệ thống và đơn vị nhận dữ liệu.\nĐIỀU 2. Nguyên tắc xử lý dữ liệu\n1. Việc xử lý phải có mục đích rõ ràng, phạm vi tối thiểu, thời hạn xác định và nhật ký thao tác.\na) Chỉ thu thập trường dữ liệu cần thiết cho kịch bản kiểm thử đã được phê duyệt.\nb) Không sao chép dữ liệu sang thiết bị cá nhân hoặc dịch vụ chưa được cho phép.\n2. Dữ liệu nhạy cảm giả lập phải được tách khỏi dữ liệu vận hành thật và không chứa định danh của cá nhân có thật.\n3. Mọi kết quả thử nghiệm phải có khả năng truy ngược tới nguồn, phiên bản và người thực hiện."
+    },
+    {
+      "page_number": 2,
+      "text": "CHƯƠNG II. THỜI HẠN LƯU TRỮ VÀ THÔNG BÁO SỰ CỐ\nMỤC 1. THỜI HẠN VÀ TRÁCH NHIỆM\nĐIỀU 3. Thời hạn lưu trữ\n1. Dữ liệu thử nghiệm thông thường được lưu tối đa 30 ngày kể từ ngày tạo.\na) Trường hợp cần kéo dài, chủ nhiệm kiểm thử phải nêu lý do và ngày kết thúc mới.\nb) Tổng thời gian gia hạn không vượt quá 90 ngày kể từ ngày tạo.\n2. Hết thời hạn lưu trữ, dữ liệu phải được xóa hoặc ẩn danh trong vòng 03 ngày làm việc.\n3. Bản sao lưu chứa dữ liệu hết hạn phải được loại bỏ trong chu kỳ sao lưu gần nhất, nhưng không muộn hơn 07 ngày.\nĐIỀU 4. Thông báo sự cố\n1. Khi phát hiện sự cố dữ liệu, bộ phận kiểm thử phải lập biên bản và thông báo cho người phụ trách trong vòng 24 giờ.\na) Thông báo phải nêu thời điểm phát hiện sự cố.\nb) Thông báo phải mô tả phạm vi dữ liệu bị ảnh hưởng.\nc) Thông báo phải ghi nhận biện pháp cô lập ban đầu và người đang xử lý.\n2. Sự cố mức nghiêm trọng phải được báo cáo sơ bộ trong 04 giờ và cập nhật ít nhất mỗi 12 giờ cho đến khi kiểm soát.\n3. Việc khắc phục, phục hồi và đóng sự cố phải được ghi nhận trong nhật ký hệ thống."
+    },
+    {
+      "page_number": 3,
+      "text": "PHẦN II. QUẢN TRỊ VÒNG ĐỜI DỮ LIỆU\nCHƯƠNG III. THU THẬP VÀ PHÂN LOẠI\nMỤC 1. THU THẬP CÓ KIỂM SOÁT\nĐIỀU 5. Hồ sơ tạo dữ liệu\n1. Trước khi tạo bộ dữ liệu, người thực hiện phải lập hồ sơ gồm mục tiêu, nguồn, trường dữ liệu, người chịu trách nhiệm và thời hạn dự kiến.\n2. Hồ sơ phải được người phụ trách phê duyệt trước khi dữ liệu được đưa vào môi trường dùng chung.\na) Thay đổi mục tiêu xử lý phải được phê duyệt lại.\nb) Thay đổi chỉ về định dạng kỹ thuật được ghi vào nhật ký mà không cần tạo hồ sơ mới.\nĐIỀU 6. Phân loại dữ liệu\n1. Dữ liệu được phân thành ba mức: công khai giả lập, nội bộ giả lập và nhạy cảm giả lập.\na) Công khai giả lập không chứa bí mật và có thể dùng trong bản demo.\nb) Nội bộ giả lập chỉ dùng trong nhóm dự án.\nc) Nhạy cảm giả lập phải mã hóa và hạn chế theo danh sách được duyệt.\n2. Khi chưa xác định được mức, dữ liệu tạm thời được quản lý theo mức nhạy cảm giả lập.\n3. Nhãn phân loại phải xuất hiện trong metadata, tên bộ dữ liệu và bản ghi audit."
+    },
+    {
+      "page_number": 4,
+      "text": "MỤC 2. QUYỀN TRUY CẬP VÀ SỬ DỤNG\nĐIỀU 7. Cấp quyền truy cập\n1. Quyền truy cập được cấp theo nguyên tắc tối thiểu và phải gắn với một vai trò cụ thể.\na) Quyền đọc có thời hạn tối đa 30 ngày cho mỗi lần phê duyệt.\nb) Quyền sửa hoặc xuất dữ liệu phải có phê duyệt của chủ nhiệm kiểm thử.\n2. Tài khoản không hoạt động liên tục 15 ngày phải bị tạm khóa quyền truy cập vào dữ liệu nhạy cảm giả lập.\n3. Danh sách quyền phải được rà soát vào ngày làm việc đầu tiên của mỗi tháng.\nĐIỀU 8. Tài khoản đặc quyền\n1. Tài khoản đặc quyền chỉ được dùng cho cấu hình, phục hồi hoặc điều tra sự cố đã có mã công việc.\na) Phiên đặc quyền phải bật xác thực đa yếu tố.\nb) Toàn bộ lệnh quản trị phải được ghi log và lưu ít nhất 180 ngày.\n2. Không được dùng chung tài khoản đặc quyền giữa hai cá nhân.\n3. Quyền khẩn cấp tự hết hạn sau 08 giờ kể từ khi được cấp."
+    },
+    {
+      "page_number": 5,
+      "text": "CHƯƠNG IV. SAO LƯU, PHỤC HỒI VÀ TIÊU HỦY\nĐIỀU 9. Sao lưu dữ liệu\n1. Dữ liệu phục vụ kịch bản kiểm thử quan trọng phải được sao lưu tự động mỗi ngày một lần.\na) Ít nhất một bản sao phải được lưu tách biệt khỏi môi trường xử lý chính.\nb) Bản sao lưu phải được mã hóa cả khi truyền và khi lưu.\n2. Tính toàn vẹn của bản sao lưu được kiểm tra bằng checksum sau mỗi lần tạo.\n3. Khả năng khôi phục phải được diễn tập tối thiểu mỗi quý một lần.\nĐIỀU 10. Mục tiêu phục hồi\n1. Đối với hệ thống kiểm thử quan trọng, thời gian phục hồi mục tiêu là 04 giờ kể từ khi quyết định phục hồi.\n2. Điểm phục hồi dữ liệu mục tiêu không vượt quá 24 giờ trước thời điểm sự cố.\na) Nếu không đạt mục tiêu, người phụ trách phải ghi rõ nguyên nhân và dữ liệu bị mất.\nb) Kết quả phục hồi phải được đối chiếu với checksum hoặc nguồn tạo dữ liệu.\n3. Dữ liệu đã tiêu hủy theo Điều 3 không được phục hồi trở lại môi trường hoạt động."
+    },
+    {
+      "page_number": 6,
+      "text": "PHẦN III. CHIA SẺ, QUYỀN VÀ GIÁM SÁT\nCHƯƠNG V. BÊN THỨ BA VÀ YÊU CẦU DỮ LIỆU\nMỤC 1. KIỂM SOÁT BÊN NHẬN\nĐIỀU 11. Chia sẻ với bên thứ ba\n1. Chỉ chia sẻ dữ liệu sau khi xác định mục đích, phạm vi, thời hạn và biện pháp xóa trả.\na) Bên nhận phải cam kết không tái sử dụng dữ liệu ngoài mục đích đã nêu.\nb) Dữ liệu nhạy cảm giả lập phải được mã hóa trước khi chuyển.\n2. Khi hết mục đích, bên nhận phải xác nhận xóa dữ liệu trong vòng 05 ngày làm việc.\n3. Việc chia sẻ xuyên biên giới không được thực hiện trong bộ dữ liệu mock này.\nĐIỀU 12. Yêu cầu tra cứu và chỉnh sửa\n1. Yêu cầu tra cứu nguồn gốc, mục đích hoặc lịch sử xử lý phải được phản hồi trong 05 ngày làm việc.\n2. Sai sót metadata phải được sửa trong vòng 02 ngày làm việc kể từ khi xác minh.\na) Nội dung gốc không bị ghi đè; bản sửa phải tạo revision mới.\nb) Nhật ký phải thể hiện giá trị trước, giá trị sau, người sửa và thời điểm sửa.\n3. Nếu từ chối yêu cầu, đơn vị xử lý phải nêu lý do và người có thẩm quyền phê duyệt.\nĐIỀU 13. Nhật ký và kiểm toán\n1. Nhật ký truy cập phải ghi tài khoản, thời gian, hành động, đối tượng dữ liệu và kết quả.\n2. Báo cáo kiểm toán được lập mỗi quý và lưu ít nhất 12 tháng.\n3. Phát hiện bất thường phải được chuyển sang quy trình sự cố tại Điều 4."
+    },
+    {
+      "page_number": 7,
+      "text": "CHƯƠNG VI. ĐÁNH GIÁ RỦI RO VÀ LIÊN TỤC HOẠT ĐỘNG\nĐIỀU 14. Đánh giá rủi ro\n1. Bộ dữ liệu mới phải được đánh giá theo khả năng xảy ra và mức độ tác động trước khi sử dụng.\na) Rủi ro thấp được chủ nhiệm kiểm thử chấp thuận.\nb) Rủi ro trung bình cần thêm biện pháp giảm thiểu và ngày rà soát.\nc) Rủi ro cao không được đưa vào sử dụng cho đến khi người phụ trách phê duyệt bằng văn bản.\n2. Đánh giá phải cập nhật khi thay đổi nguồn, mục đích, công nghệ hoặc bên nhận.\nĐIỀU 15. Bảo toàn chứng cứ sự cố\n1. Log, checksum, ảnh chụp trạng thái và bản sao cấu hình liên quan phải được niêm phong logic ngay khi điều tra.\n2. Chuỗi bàn giao chứng cứ phải ghi người giao, người nhận, thời điểm và lý do truy cập.\na) Không sửa trực tiếp chứng cứ gốc.\nb) Phân tích được thực hiện trên bản sao có checksum đối chiếu.\n3. Chứng cứ sự cố được lưu 180 ngày sau khi đóng vụ việc, trừ khi quyết định điều tra yêu cầu lâu hơn.\nĐIỀU 16. Kế hoạch liên tục\n1. Kế hoạch liên tục phải xác định dịch vụ ưu tiên, người thay thế, kênh liên lạc và phương án làm việc thủ công.\n2. Diễn tập kế hoạch được thực hiện sáu tháng một lần.\n3. Sau diễn tập phải có danh sách điểm chưa đạt, người xử lý và thời hạn khắc phục không quá 30 ngày."
+    },
+    {
+      "page_number": 8,
+      "text": "PHẦN IV. TỔ CHỨC THỰC HIỆN\nCHƯƠNG VII. TRÁCH NHIỆM, BÁO CÁO VÀ HIỆU LỰC\nĐIỀU 17. Trách nhiệm của các vai trò\n1. Người tạo dữ liệu chịu trách nhiệm về nguồn, nhãn MOCK và tính chính xác của metadata ban đầu.\n2. Chủ nhiệm kiểm thử phê duyệt mục đích, quyền truy cập, gia hạn và việc chia sẻ.\n3. Người vận hành chịu trách nhiệm sao lưu, giám sát, phục hồi và lưu nhật ký kỹ thuật.\nĐIỀU 18. Chế độ báo cáo\n1. Báo cáo vận hành được lập trước ngày 05 hằng tháng, gồm số bộ dữ liệu mới, bộ hết hạn, sự cố và yêu cầu truy cập.\n2. Báo cáo quý bổ sung kết quả rà soát quyền, kiểm toán log và diễn tập phục hồi.\n3. Số liệu chưa xác minh phải được đánh dấu dự kiến, không trình bày như kết quả cuối.\nĐIỀU 19. Hiệu lực\n1. Quy chế mẫu này có hiệu lực từ ngày 15 tháng 01 năm 2026.\n2. Dữ liệu đã tồn tại trước ngày hiệu lực phải được rà soát và gắn nhãn trong vòng 15 ngày.\n3. Quy chế này chỉ dùng cho kiểm thử LexFlow và không có giá trị áp dụng pháp lý bên ngoài.\nĐIỀU 20. Điều khoản chuyển tiếp\n1. Quyền truy cập đã cấp trước ngày hiệu lực phải được rà soát lại trong vòng 10 ngày.\n2. Bộ dữ liệu không xác định được nguồn phải được cách ly, không tiếp tục sử dụng và xử lý trong vòng 05 ngày làm việc.\n3. Vướng mắc trong quá trình thử nghiệm được ghi vào nhật ký thay đổi để xem xét ở phiên bản mock tiếp theo."
+    }
+  ]
+}

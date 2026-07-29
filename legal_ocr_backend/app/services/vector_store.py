@@ -20,7 +20,16 @@ class VectorStore:
 
     def ensure_collection(self) -> None:
         existing = {item.name for item in self.client.get_collections().collections}
-        if self.settings.qdrant_collection not in existing:
+        if self.settings.qdrant_collection in existing:
+            info = self.client.get_collection(self.settings.qdrant_collection)
+            vectors = info.config.params.vectors
+            size = getattr(vectors, "size", None)
+            if size is not None and int(size) != self.embedder.vector_size:
+                raise RuntimeError(
+                    "Qdrant collection vector size không khớp embedding ver2. "
+                    "Hãy dùng collection mới hoặc reindex dữ liệu."
+                )
+        else:
             self.client.create_collection(
                 collection_name=self.settings.qdrant_collection,
                 vectors_config=models.VectorParams(
@@ -51,11 +60,20 @@ class VectorStore:
 
     def search(self, query: str, limit: int, document_id: str | None = None) -> list[dict]:
         self.ensure_collection()
-        query_filter = None
-        if document_id:
-            query_filter = models.Filter(
-                must=[models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id))]
+        conditions = [
+            models.FieldCondition(
+                key="contract_version",
+                match=models.MatchValue(value=self.settings.contract_version),
             )
+        ]
+        if document_id:
+            conditions.append(
+                models.FieldCondition(
+                    key="document_id",
+                    match=models.MatchValue(value=document_id),
+                )
+            )
+        query_filter = models.Filter(must=conditions)
         response = self.client.query_points(
             collection_name=self.settings.qdrant_collection,
             query=self.embedder.encode([query])[0],

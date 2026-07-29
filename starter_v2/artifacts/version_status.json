@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "active_version": "v3",
+  "active_version": "ver2",
   "evidence_policy": "Offline tests are not substitutes for live provider run JSON.",
   "versions": [
     {
@@ -15,7 +15,7 @@
         "no prompt-injection boundary"
       ],
       "hypothesis": "Measure intentionally weak starter behavior before any fix.",
-      "live_result": "pending_provider_run"
+      "live_result": "runs/comparisons/prompt_progress_5_20260729T231336828571/v0.json; 3/5; provider_error_cases=0"
     },
     {
       "version": "v1",
@@ -29,31 +29,43 @@
         "argument validation is incomplete"
       ],
       "hypothesis": "Explicit intent routing and argument conventions improve base accuracy.",
-      "live_result": "pending_provider_run"
+      "live_result": "runs/comparisons/prompt_progress_5_20260729T231336828571/v1.json; 5/5; provider_error_cases=0"
     },
     {
       "version": "v2",
-      "stage": "defense_in_depth",
+      "stage": "legal_ocr_rag_integration",
       "prompt_file": "artifacts/versions/v2/system_prompt.md",
       "tools_file": "artifacts/tools.yaml",
       "known_gaps": [
-        "pattern detection cannot prove arbitrary semantic safety",
-        "live-model false-positive rate still requires measurement"
+        "citation/effective gates are concise and rely more heavily on the model",
+        "duplicate retrieval policy is not explicit enough"
       ],
-      "hypothesis": "An orchestration guard plus untrusted-result boundaries blocks common injection without adding grader-visible tool calls.",
-      "live_result": "pending_provider_run"
+      "hypothesis": "Replacing research tools with exact legal lookup and OCR/RAG contracts enables real LexFlow retrieval.",
+      "live_result": "runs/v2_B_group_groq_20260729T225728607977_rescored.json; 10/10; provider_error_cases=0"
     },
     {
       "version": "v3",
+      "stage": "legal_fail_closed_hardening",
+      "prompt_file": "artifacts/system_prompt.md",
+      "tools_file": "artifacts/tools.yaml",
+      "known_gaps": [
+        "two keys in the same Groq organization may share daily quota",
+        "the fixture currently has one indexed legal document version"
+      ],
+      "hypothesis": "Explicit evidence/effective/citation gates plus duplicate-call limits prevent unsupported legal answers.",
+      "live_result": "runs/v3_B_attack_groq_20260729T233210074365.json; 15/15; provider_error_cases=0"
+    },
+    {
+      "version": "ver2",
       "stage": "final_candidate",
       "prompt_file": "artifacts/system_prompt.md",
       "tools_file": "artifacts/tools.yaml",
       "known_gaps": [
-        "requires live provider and tool execution evidence",
-        "no system can guarantee coverage of every future prompt attack"
+        "live provider availability still depends on external quota",
+        "no finite attack suite guarantees coverage of every future prompt attack"
       ],
       "hypothesis": "Complete routing, multi-turn, source, action and injection policies minimize public and hidden-like failures.",
-      "live_result": "pending_provider_run"
+      "live_result": "group 10/10 and v3 attack 15/15; provider_error_cases=0"
     }
   ]
 }

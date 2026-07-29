@@ -1,28 +1,35 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    contract_version: str = "ver2"
     app_name: str = "Legal OCR API"
     api_prefix: str = "/api/v1"
     database_url: str = "sqlite:///./data/legal_ocr.db"
     qdrant_url: str | None = None
     qdrant_path: Path = Path("./data/qdrant")
-    qdrant_collection: str = "legal_provisions"
-    embedding_model: str = "BAAI/bge-m3"
+    qdrant_collection: str = "legal_provisions_ver2"
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     enable_transformer_embedding: bool = False
     upload_dir: Path = Path("./data/uploads")
     page_image_dir: Path = Path("./data/page_images")
     export_dir: Path = Path("./data/exports")
     tesseract_cmd: str | None = None
+    tessdata_dir: Path | None = None
     ocr_languages: str = "vie+eng"
+    ocr_dpi_scale: float = 2.5
     max_upload_mb: int = 100
-    frontend_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    rag_min_score: float = 0.24
+    frontend_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173", "http://localhost:3000"]
+    public_api_base_url: str = "http://localhost:8000/api/v1"
     llm_cleanup_provider: str = "openrouter"
     llm_cleanup_model: str = "openai/gpt-4o-mini"
+    mock_fixture_path: Path = Path("./fixtures/mock_legal_document_ver2.json")
     openrouter_api_key: str | None = None
     openai_api_key: str | None = None
 

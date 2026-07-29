@@ -24,12 +24,21 @@ class Embedder:
 
     @property
     def model_name(self) -> str:
-        return self.settings.embedding_model if self.model else "local-vietnamese-hashing-v1"
+        return self.settings.embedding_model if self.model else "local-vietnamese-hashing-ver2"
+
+    @property
+    def is_semantic(self) -> bool:
+        return self.model is not None
 
     @property
     def vector_size(self) -> int:
         if self.model:
-            return int(self.model.get_sentence_embedding_dimension())
+            dimension = (
+                self.model.get_embedding_dimension()
+                if hasattr(self.model, "get_embedding_dimension")
+                else self.model.get_sentence_embedding_dimension()
+            )
+            return int(dimension)
         return VECTOR_SIZE
 
     def encode(self, texts: list[str]) -> list[list[float]]:
@@ -56,4 +65,3 @@ class Embedder:
 @lru_cache
 def get_embedder() -> Embedder:
     return Embedder()
-

@@ -10,6 +10,7 @@ from typing import Any
 from agent import ResearchAgent
 from env_loader import load_lab_env
 from providers import make_provider
+from security import redact_secrets
 from tools import TOOL_FUNCTIONS, load_tool_declarations, to_openai_tools
 from versioning import artifact_version_dict, build_artifact_version
 
@@ -112,7 +113,17 @@ def compare_subset(expected: dict[str, Any], actual: dict[str, Any]) -> tuple[bo
     for key, expected_value in expected.items():
         total += 1
         actual_value = actual.get(key)
-        if key == "missing_fields":
+        if isinstance(expected_value, dict) and "contains_all" in expected_value:
+            normalized_actual = str(normalize_value(actual_value) or "")
+            ok = all(
+                str(normalize_value(item)) in normalized_actual
+                for item in expected_value["contains_all"]
+            )
+        elif isinstance(expected_value, dict) and "one_of" in expected_value:
+            ok = normalize_value(actual_value) in {
+                normalize_value(item) for item in expected_value["one_of"]
+            }
+        elif key == "missing_fields":
             expected_set = set(expected_value)
             actual_set = set(actual_value or [])
             ok = expected_set.issubset(actual_set)
@@ -262,9 +273,14 @@ def print_table(results: list[dict[str, Any]], summary: dict[str, Any]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Research Agent live evals.")
     parser.add_argument("--phase", choices=["B"], default="B")
-    parser.add_argument("--suite", choices=["base", "group", "cross", "extension"], default="base", help="Run label saved to JSON; does not filter --eval-cases.")
+    parser.add_argument(
+        "--suite",
+        choices=["base", "group", "attack", "cross", "extension"],
+        default="base",
+        help="Run label saved to JSON; does not filter --eval-cases.",
+    )
     parser.add_argument("--version", required=True)
-    parser.add_argument("--provider", choices=["openai", "openrouter", "anthropic", "gemini"], required=True)
+    parser.add_argument("--provider", choices=["openai", "openrouter", "anthropic", "gemini", "groq"], required=True)
     parser.add_argument("--model", default=None)
     parser.add_argument("--system-prompt", type=Path, default=ARTIFACTS_DIR / "system_prompt.md")
     parser.add_argument("--tools", type=Path, default=ARTIFACTS_DIR / "tools.yaml")
@@ -305,7 +321,7 @@ def main() -> None:
                 "failure_type": "provider_error",
                 "case_failure_type": case.get("failure_type"),
                 "observed_mismatch": "provider_error",
-                "failures": [f"{type(exc).__name__}: {str(exc)}"],
+                "failures": [f"{type(exc).__name__}: {redact_secrets(str(exc))}"],
                 "actual_tool_calls": [],
                 "actual_text": None,
                 "routing_correct": False,

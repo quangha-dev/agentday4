@@ -7,17 +7,17 @@ import {
   WandSparkles,
 } from "lucide-react";
 import StatusBadge from "./StatusBadge";
-import { API_BASE, api, DocumentItem, LegalMetadata, PageItem } from "../lib/api";
+import { API_BASE, api, DocumentItem, LegalMetadata, PageItem, SystemReadiness } from "../lib/api";
 
 const apiOrigin = API_BASE.replace(/\/api\/v1\/?$/, "");
 const initialMetadata: LegalMetadata = {
-  document_number: "66.24/2026/NQ-CP",
-  issued_date: "2026-07-26",
-  effective_date: "2026-07-26",
-  document_type: "Nghị quyết",
-  issuing_authority: "Chính phủ",
-  signer: "Nguyễn Văn Thắng",
-  summary: "Về xử lý khó khăn, vướng mắc trong quy định về lập, phân bổ và giao dự toán chi sự nghiệp cho hoạt động khoa học, công nghệ và đổi mới sáng tạo",
+  document_number: "",
+  issued_date: "",
+  effective_date: "",
+  document_type: "",
+  issuing_authority: "",
+  signer: "",
+  summary: "",
 };
 
 export default function OcrStudio() {
@@ -34,10 +34,15 @@ export default function OcrStudio() {
   const [showDiff, setShowDiff] = useState(false);
   const [progress, setProgress] = useState(0);
   const [chunkResult, setChunkResult] = useState<{ count: number; strategy: string } | null>(null);
+  const [readiness, setReadiness] = useState<SystemReadiness | null>(null);
 
   const page = pages[pageIndex] ?? null;
   const verifiedCount = pages.filter((item) => item.is_verified).length;
   const currentStep = !document ? 1 : pages.length === 0 ? 2 : chunkResult ? 4 : 3;
+
+  useEffect(() => {
+    api.readiness().then(setReadiness).catch(() => setReadiness(null));
+  }, []);
 
   const refreshPages = async (documentId = document?.id) => {
     if (!documentId) return;
@@ -47,8 +52,10 @@ export default function OcrStudio() {
   };
 
   useEffect(() => {
-    if (page) setText(page.verified_text ?? page.cleaned_text ?? page.raw_text);
-  }, [page?.id, page?.cleaned_text, page?.verified_text, page?.raw_text]);
+    if (!page) return;
+    const pageText = page.verified_text ?? page.cleaned_text ?? page.raw_text;
+    queueMicrotask(() => setText(pageText));
+  }, [page]);
 
   const updateMetadata = (field: keyof LegalMetadata, value: string) => {
     setMetadata((current) => ({ ...current, [field]: value }));
@@ -70,6 +77,9 @@ export default function OcrStudio() {
     if (!document) return;
     setBusy("ocr"); setError(""); setProgress(4);
     try {
+      const currentReadiness = await api.readiness();
+      setReadiness(currentReadiness);
+      if (!currentReadiness.ocr.ready) throw new Error(currentReadiness.ocr.error?.message ?? "OCR chưa sẵn sàng");
       const job = await api.process(document.id);
       for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 850));
@@ -79,6 +89,7 @@ export default function OcrStudio() {
         if (state.status === "FAILED") throw new Error(state.message ?? "OCR thất bại");
       }
       await refreshPages(document.id);
+      setDocument(await api.document(document.id));
       setNotice("OCR hoàn tất. Hãy đối chiếu PDF và văn bản theo từng trang.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "OCR thất bại"); }
     finally { setBusy(""); }
@@ -103,10 +114,34 @@ export default function OcrStudio() {
     finally { setBusy(""); }
   };
 
+  const verifyAllPages = async () => {
+    const pendingPages = pages.filter((item) => !item.is_verified);
+    if (pendingPages.length === 0) return;
+    setBusy("verify-all"); setError("");
+    try {
+      let completed = 0;
+      for (const item of pendingPages) {
+        const content = item.id === page?.id
+          ? text
+          : item.verified_text ?? item.cleaned_text ?? item.raw_text;
+        const updated = await api.verify(item.id, content);
+        setPages((current) => current.map((candidate) => candidate.id === updated.id ? updated : candidate));
+        completed += 1;
+        setNotice(`Đang xác nhận trang: ${completed}/${pendingPages.length}.`);
+      }
+      setNotice(`Đã xác nhận tất cả ${pages.length} trang.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể xác nhận tất cả các trang");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const processAndIndex = async () => {
     if (!document) return;
     setBusy("finalize"); setError(""); setChunkResult(null);
     try {
+      if (verifiedCount !== pages.length) throw new Error(`Cần xác nhận đủ ${pages.length} trang trước khi xử lý dữ liệu.`);
       const parsed = await api.parse(document.id);
       setNotice(`${parsed.message}. Đang chia chunk theo cấu trúc pháp luật…`);
       const indexed = await api.index(document.id);
@@ -128,6 +163,7 @@ export default function OcrStudio() {
 
     <ol className="process-steps">{["Thông tin", "OCR", "Đối chiếu", "Lưu dữ liệu"].map((label, index) => <li key={label} className={currentStep >= index + 1 ? "active" : ""}><span>{currentStep > index + 1 ? <Check size={13}/> : index + 1}</span><b>{label}</b></li>)}</ol>
     {(notice || error) && <div className={`notice ${error ? "notice-error" : ""}`}>{error || notice}</div>}
+    {readiness && !readiness.ocr.ready && <div className="notice notice-error">OCR chưa sẵn sàng: {readiness.ocr.error?.message}</div>}
     {busy === "ocr" && <div className="progress-track"><span style={{ width: `${progress}%` }}/><small>{progress}%</small></div>}
 
     {!document ? <form className="metadata-upload-grid" onSubmit={upload}>
@@ -161,16 +197,15 @@ export default function OcrStudio() {
       </section>
 
       {pages.length === 0 ? <section className="ocr-ready-card"><span><ScanLine size={36}/></span><div><h2>Hồ sơ đã sẵn sàng để OCR</h2><p>Hệ thống tự chọn text layer hoặc Tesseract theo từng trang PDF.</p></div><button className="primary-button" onClick={startOcr} disabled={!!busy}>{busy === "ocr" ? <LoaderCircle className="spin" size={17}/> : <Play size={17}/>} Bắt đầu OCR</button></section> : <>
-        <section className="review-toolbar"><div><span>ĐỐI CHIẾU TỪNG TRANG</span><strong>{verifiedCount}/{pages.length} trang đã xác nhận</strong></div><a href={api.fileUrl(document.id, page?.page_number ?? 1)} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Mở PDF gốc</a></section>
+        <section className="review-toolbar"><div><span>ĐỐI CHIẾU TỪNG TRANG</span><strong>{verifiedCount}/{pages.length} trang đã xác nhận</strong></div><div className="review-toolbar-actions"><button className="verify-all-button" onClick={verifyAllPages} disabled={!!busy || verifiedCount === pages.length}>{busy === "verify-all" ? <LoaderCircle className="spin" size={15}/> : <CheckCircle2 size={15}/>} {verifiedCount === pages.length ? "Đã xác nhận tất cả" : "Xác nhận tất cả"}</button><a href={api.fileUrl(document.id, page?.page_number ?? 1)} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Mở PDF gốc</a></div></section>
         <section className="ocr-review-grid">
           <aside className="review-pages"><span>TRANG</span>{pages.map((item, index) => <button key={item.id} className={index === pageIndex ? "active" : ""} onClick={() => { setPageIndex(index); setShowDiff(false); }}><b>{String(item.page_number).padStart(2, "0")}</b><small>{item.classification}</small>{item.is_verified && <i><Check size={11}/></i>}</button>)}</aside>
           <section className="pdf-page-panel"><div className="review-panel-head"><span>PDF · TRANG {page?.page_number}</span><b>{page?.confidence ? `${Math.round(page.confidence)}% tin cậy` : "Chưa có độ tin cậy"}</b></div><div className="pdf-page-scroll">{imageUrl ? <img src={imageUrl} alt={`PDF trang ${page?.page_number}`}/> : <span>Không có ảnh trang</span>}</div></section>
           <section className="text-page-panel"><div className="review-panel-head"><span>TEXT · TRANG {page?.page_number}</span><button className={showDiff ? "active" : ""} onClick={() => setShowDiff(!showDiff)}><ArrowLeftRight size={15}/> So sánh</button></div>{showDiff ? <div className="text-diff"><div><small>BẢN OCR THÔ</small><pre>{page?.raw_text}</pre></div><div><small>BẢN ĐANG DUYỆT</small><pre>{text}</pre></div></div> : <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false}/>}<div className="text-stats"><span>{text.length.toLocaleString("vi-VN")} ký tự</span><span>{page?.bounding_boxes.length ?? 0} vùng nhận dạng</span></div><div className="text-actions"><button onClick={cleanWithLlm} disabled={!!busy}><WandSparkles size={16}/> LLM xoá ký tự thừa</button><button onClick={() => page && runPageAction("save", () => api.saveText(page.id, text), "Đã lưu chỉnh sửa trang." )} disabled={!!busy}><Save size={16}/> Lưu</button><button className="primary" onClick={() => page && runPageAction("verify", () => api.verify(page.id, text), "Đã xác nhận trang." )} disabled={!!busy}><CheckCircle2 size={16}/> Xác nhận</button></div></section>
         </section>
 
-        <section className="finalize-card"><div className="finalize-icon"><FileJson size={24}/></div><div><span>HIERARCHICAL LEGAL CHUNKING</span><h2>Phân tích cấu trúc và lưu vector database</h2><p>Mỗi chunk giữ metadata văn bản cùng đường dẫn Phần / Chương / Mục / Điều / Khoản / Điểm; ưu tiên không cắt ngang đơn vị pháp luật.</p>{chunkResult && <small>Đã tạo {chunkResult.count} chunk · {chunkResult.strategy}</small>}</div><div className="finalize-actions"><a href={api.exportUrl(document.id)}><Download size={16}/> Xuất JSON</a><button onClick={processAndIndex} disabled={!!busy}>{busy === "finalize" ? <LoaderCircle className="spin" size={17}/> : <Sparkles size={17}/>} Xử lý & lưu dữ liệu</button></div></section>
+        <section className="finalize-card"><div className="finalize-icon"><FileJson size={24}/></div><div><span>HIERARCHICAL LEGAL CHUNKING · VER2</span><h2>Phân tích cấu trúc và lưu vector database</h2><p>Mỗi chunk giữ metadata riêng và nội dung luật sạch theo Phần / Chương / Mục / Điều / Khoản / Điểm. Chỉ xử lý khi mọi trang đã được xác nhận.</p>{verifiedCount !== pages.length && <small>Còn {pages.length - verifiedCount} trang chưa xác nhận.</small>}{chunkResult && <small>Đã tạo {chunkResult.count} chunk · {chunkResult.strategy}</small>}</div><div className="finalize-actions"><a href={api.exportUrl(document.id)}><Download size={16}/> Xuất JSON</a><button onClick={processAndIndex} disabled={!!busy || verifiedCount !== pages.length}>{busy === "finalize" ? <LoaderCircle className="spin" size={17}/> : <Sparkles size={17}/>} Xử lý & lưu dữ liệu</button></div></section>
       </>}
     </>}
   </main>;
 }
-

@@ -16,6 +16,8 @@ starter/
 
 # Tool scratch output
 arxiv_papers/
+.runtime/
+legal_ocr_backend/.tmp-tests-ver2*/
 
 # OS / editor
 .DS_Store

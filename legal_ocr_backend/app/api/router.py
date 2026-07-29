@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -35,10 +35,12 @@ from app.schemas import (
     SearchResult,
     TextUpdate,
 )
-from app.services.chunking import build_article_chunks
+from app.services.chunking import build_embedding_text
 from app.services.cleanup import clean_page_text
 from app.services.embedding import get_embedder
+from app.services.indexing import index_parsed_document
 from app.services.llm_cleanup import clean_with_llm
+from app.services.ocr import ocr_readiness
 from app.services.vector_store import get_vector_store
 from app.services.workflow import clean_document_pages, parse_document, process_document
 
@@ -83,7 +85,29 @@ def node_out(node: LegalNode) -> LegalNodeOut:
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": settings.app_name}
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "contract_version": settings.contract_version,
+    }
+
+
+@router.get("/system/readiness")
+def system_readiness() -> dict:
+    ocr = ocr_readiness(settings)
+    embedder = get_embedder()
+    return {
+        "contract_version": settings.contract_version,
+        "ready": bool(ocr["ready"] and embedder.is_semantic),
+        "ocr": ocr,
+        "embedding": {
+            "ready": embedder.is_semantic,
+            "model": embedder.model_name,
+            "semantic": embedder.is_semantic,
+            "vector_size": embedder.vector_size,
+            "collection": settings.qdrant_collection,
+        },
+    }
 
 
 @router.post("/documents/upload", response_model=DocumentOut, status_code=201)
@@ -106,23 +130,55 @@ def upload_document(
         raise HTTPException(413, f"File vượt quá {settings.max_upload_mb} MB")
     if not content.startswith(b"%PDF"):
         raise HTTPException(415, "Nội dung file không phải PDF hợp lệ")
+    text_fields = {
+        "document_number": document_number,
+        "document_type": document_type,
+        "issuing_authority": issuing_authority,
+        "signer": signer,
+        "summary": summary,
+    }
+    missing = [name for name, value in text_fields.items() if not value.strip()]
+    if missing:
+        raise HTTPException(422, "Thiếu metadata bắt buộc: " + ", ".join(missing))
+    if effective_date < issued_date:
+        raise HTTPException(422, "Ngày có hiệu lực không được trước ngày ban hành")
+    document_number = document_number.strip()
+    document_type = document_type.strip()
+    issuing_authority = issuing_authority.strip()
+    signer = signer.strip()
+    summary = summary.strip()
     digest = hashlib.sha256(content).hexdigest()
     existing = db.scalar(select(Document).where(Document.sha256 == digest))
     if existing:
-        existing.document_number = document_number
-        existing.issued_date = issued_date
-        existing.effective_date = effective_date
-        existing.document_type = document_type
-        existing.issuing_authority = issuing_authority
-        existing.signer = signer
-        existing.summary = summary
-        db.commit()
-        db.refresh(existing)
-        return existing
+        same_metadata = all(
+            (
+                existing.document_number == document_number,
+                existing.issued_date == issued_date,
+                existing.effective_date == effective_date,
+                existing.document_type == document_type,
+                existing.issuing_authority == issuing_authority,
+                existing.signer == signer,
+                existing.summary == summary,
+            )
+        )
+        if same_metadata:
+            return existing
+        raise HTTPException(
+            409,
+            "PDF này đã tồn tại với metadata khác. Metadata của hồ sơ đã lưu là bất biến; hãy kiểm tra lại hồ sơ hiện có.",
+        )
 
+    latest_version = db.scalar(
+        select(func.max(Document.version_number)).where(
+            Document.document_number == document_number
+        )
+    ) or 0
     previous = db.scalar(
         select(Document)
-        .where(Document.document_number == document_number)
+        .where(
+            Document.document_number == document_number,
+            Document.status == "INDEXED",
+        )
         .order_by(Document.version_number.desc())
         .limit(1)
     )
@@ -143,7 +199,7 @@ def upload_document(
         issuing_authority=issuing_authority,
         signer=signer,
         summary=summary,
-        version_number=(previous.version_number + 1) if previous else 1,
+        version_number=latest_version + 1,
         previous_version_id=previous.id if previous else None,
         original_filename=filename,
         stored_path=str(target.resolve()),
@@ -195,6 +251,18 @@ def start_processing(
     document_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> ProcessingJob:
     document = get_document_or_404(db, document_id)
+    active_job = db.scalar(
+        select(ProcessingJob)
+        .where(
+            ProcessingJob.document_id == document.id,
+            ProcessingJob.job_type == "OCR",
+            ProcessingJob.status.in_(["PENDING", "RUNNING"]),
+        )
+        .order_by(ProcessingJob.created_at.desc())
+        .limit(1)
+    )
+    if active_job:
+        return active_job
     job = ProcessingJob(document_id=document.id, job_type="OCR")
     db.add(job)
     db.commit()
@@ -244,6 +312,8 @@ def clean_page(page_id: str, db: Session = Depends(get_db)) -> PageOut:
     if not page:
         raise HTTPException(404, "Không tìm thấy trang")
     page.cleaned_text = clean_page_text(page.raw_text)
+    page.verified_text = None
+    page.is_verified = False
     db.add(TextRevision(page_id=page.id, revision_type="cleaned", content=page.cleaned_text))
     page.document.status = "CLEANED"
     audit(db, "page.cleaned", page.document_id, page.id)
@@ -259,6 +329,8 @@ def clean_page_with_llm(page_id: str, db: Session = Depends(get_db)) -> CleanupO
         raise HTTPException(404, "Không tìm thấy trang")
     cleaned, method, warning = clean_with_llm(page.raw_text)
     page.cleaned_text = cleaned
+    page.verified_text = None
+    page.is_verified = False
     page.document.status = "CLEANED"
     db.add(TextRevision(page_id=page.id, revision_type=method, content=cleaned))
     audit(db, "page.cleaned", page.document_id, page.id, method=method, warning=warning)
@@ -282,6 +354,7 @@ def update_page_text(page_id: str, payload: TextUpdate, db: Session = Depends(ge
     if not page:
         raise HTTPException(404, "Không tìm thấy trang")
     page.cleaned_text = payload.content
+    page.verified_text = None
     page.is_verified = False
     db.add(TextRevision(page_id=page.id, revision_type="edited", content=payload.content))
     audit(db, "page.edited", page.document_id, page.id, characters=len(payload.content))
@@ -314,7 +387,10 @@ def verify_page(page_id: str, payload: TextUpdate, db: Session = Depends(get_db)
 @router.post("/documents/{document_id}/parse")
 def parse_document_endpoint(document_id: str, db: Session = Depends(get_db)) -> dict:
     document = get_document_or_404(db, document_id)
-    count = parse_document(db, document)
+    try:
+        count = parse_document(db, document)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     audit(db, "document.parsed", document.id, nodes=count)
     db.commit()
     return {"message": "Phân tích cấu trúc hoàn tất", "node_count": count}
@@ -348,6 +424,9 @@ def export_json(document_id: str, db: Session = Depends(get_db)) -> JSONResponse
         ).order_by(LegalNode.order_index)
     )
     payload = {
+        "contract_version": settings.contract_version,
+        "parser_version": "legal-structure-ver2",
+        "chunk_version": "legal-hierarchy-ver2",
         "document_id": document.id,
         "title": document.title,
         "metadata": {
@@ -362,6 +441,17 @@ def export_json(document_id: str, db: Session = Depends(get_db)) -> JSONResponse
             "previous_version_id": document.previous_version_id,
         },
         "status": document.status,
+        "pages": [
+            {
+                "page_number": page.page_number,
+                "classification": page.classification,
+                "ocr_engine": page.ocr_engine,
+                "ocr_languages": page.ocr_languages,
+                "confidence": page.confidence,
+                "is_verified": page.is_verified,
+            }
+            for page in document.pages
+        ],
         "structure": [node_out(node).model_dump() for node in roots],
         "chunks": [
             {
@@ -369,6 +459,11 @@ def export_json(document_id: str, db: Session = Depends(get_db)) -> JSONResponse
                 "legal_node_id": chunk.legal_node_id,
                 "chunk_index": chunk.chunk_index,
                 "text": chunk.chunk_text,
+                "embedding_text": build_embedding_text(
+                    document,
+                    chunk.chunk_text,
+                    list((chunk.chunk_metadata or {}).get("structural_positions") or []),
+                ),
                 "metadata": chunk.chunk_metadata,
             }
             for chunk in db.scalars(
@@ -386,69 +481,20 @@ def export_json(document_id: str, db: Session = Depends(get_db)) -> JSONResponse
 @router.post("/documents/{document_id}/index")
 def index_document(document_id: str, db: Session = Depends(get_db)) -> dict:
     document = get_document_or_404(db, document_id)
-    nodes = list(
-        db.scalars(
-            select(LegalNode).where(
-                LegalNode.document_id == document_id, LegalNode.node_type == "article"
-            )
+    if document.status != "PARSED":
+        raise HTTPException(409, "Tài liệu phải ở trạng thái PARSED trước khi lập chỉ mục")
+    unverified_count = db.scalar(
+        select(func.count(DocumentPage.id)).where(
+            DocumentPage.document_id == document.id,
+            DocumentPage.is_verified.is_(False),
         )
     )
-    if not nodes:
-        raise HTTPException(409, "Hãy phân tích cấu trúc trước khi lập chỉ mục")
-    store, embedder = get_vector_store(), get_embedder()
-    old_chunks = list(
-        db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == document.id))
-    )
-    store.delete([chunk.point_id for chunk in old_chunks])
-    db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document.id))
-    items: list[dict] = []
-    chunk_count = 0
-    for node in nodes:
-        for draft in build_article_chunks(document, node):
-            point_id = str(uuid.uuid4())
-            db.add(
-                DocumentChunk(
-                    id=point_id,
-                    document_id=document.id,
-                    legal_node_id=node.id,
-                    chunk_index=draft.chunk_index,
-                    chunk_text=draft.text,
-                    token_estimate=draft.token_estimate,
-                    chunk_metadata=draft.metadata,
-                    content_hash=draft.content_hash,
-                    point_id=point_id,
-                    embedding_model=embedder.model_name,
-                )
-            )
-            items.append(
-                {
-                    "point_id": point_id,
-                    "text": draft.text,
-                    "payload": {**draft.metadata, "content": draft.text, "chunk_id": point_id},
-                }
-            )
-            chunk_count += 1
-    store.upsert(items)
-    for node in nodes:
-        node.is_indexed = True
-    document.status = "INDEXED"
-    audit(
-        db,
-        "document.indexed",
-        document.id,
-        articles=len(nodes),
-        chunks=chunk_count,
-        strategy="legal-hierarchy-article-clause-v1",
-        model=embedder.model_name,
-    )
-    db.commit()
-    return {
-        "message": "Lập chỉ mục hoàn tất",
-        "indexed_articles": len(nodes),
-        "indexed_chunks": chunk_count,
-        "chunk_strategy": "legal-hierarchy-article-clause-v1",
-        "model": embedder.model_name,
-    }
+    if unverified_count:
+        raise HTTPException(409, "Không thể index khi còn trang chưa xác nhận")
+    try:
+        return index_parsed_document(db, document)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 def _sql_search(payload: SearchRequest, db: Session) -> list[SearchResult]:
@@ -490,7 +536,15 @@ def search(payload: SearchRequest, db: Session = Depends(get_db)) -> list[Search
     if payload.mode in {"exact", "keyword"}:
         return _sql_search(payload, db)
     semantic = get_vector_store().search(payload.query, payload.limit, payload.document_id)
-    results = [SearchResult(**item) for item in semantic]
+    results = [
+        SearchResult(
+            **{
+                **item,
+                "content": item.get("legal_text") or item.get("content") or "",
+            }
+        )
+        for item in semantic
+    ]
     if payload.mode == "hybrid":
         lexical = _sql_search(payload.model_copy(update={"mode": "keyword"}), db)
         seen = {item.legal_node_id for item in results}

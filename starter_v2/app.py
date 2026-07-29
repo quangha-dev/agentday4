@@ -10,7 +10,14 @@ from typing import Any
 
 import streamlit as st
 
-from chat import now_iso, run_model_tool_loop, safe_slug, trim_history, write_transcript
+from chat import (
+    now_iso,
+    run_model_tool_loop,
+    runtime_context_message,
+    safe_slug,
+    trim_history,
+    write_transcript,
+)
 from env_loader import load_lab_env
 from providers import make_provider
 from security import redact_secrets
@@ -27,6 +34,7 @@ PROVIDER_KEYS = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
 }
 
 
@@ -130,7 +138,7 @@ def render_trace(turn: dict[str, Any]) -> None:
             st.json(round_item.get("tool_results", []))
 
 
-st.set_page_config(page_title="Research Agent v0→v3", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="LexFlow Agent ver2", page_icon="🛡️", layout="wide")
 ensure_session()
 status = load_version_status()
 versions = {item["version"]: item for item in status["versions"]}
@@ -143,12 +151,17 @@ with st.sidebar:
     selected_version = st.selectbox(
         "Artifact version",
         options=list(versions),
-        index=list(versions).index(status.get("active_version", "v3")),
+        index=list(versions).index(status.get("active_version", "ver2")),
     )
     provider_name = st.selectbox("Provider", options=list(PROVIDER_KEYS), index=0)
     model_override = st.text_input("Model override (optional)", value="").strip() or None
     key_name = PROVIDER_KEYS[provider_name]
-    st.write(f"Credential `{key_name}`: {'configured' if os.getenv(key_name) else 'missing'}")
+    configured = bool(os.getenv(key_name))
+    if provider_name == "groq":
+        configured = make_provider("groq").key_count > 0
+    st.write(f"Credential `{key_name}`: {'configured' if configured else 'missing'}")
+    if provider_name == "groq" and configured:
+        st.caption(f"Quota failover pool: {make_provider('groq').key_count} key(s); values are never displayed.")
     if st.button("New clean session", use_container_width=True):
         for key in ("transcript_id", "history", "turns", "created_at"):
             st.session_state.pop(key, None)
@@ -195,6 +208,7 @@ with tab_chat:
             provider = make_provider(provider_name)
             messages = [
                 {"role": "system", "content": system_prompt},
+                runtime_context_message(),
                 *trim_history(st.session_state.history, 5),
                 {"role": "user", "content": user_text},
             ]
@@ -203,7 +217,7 @@ with tab_chat:
                 messages=messages,
                 tools=openai_tools,
                 model=model_override,
-                max_tool_rounds=4,
+                max_tool_rounds=6,
             )
             turn_record.update(result)
             st.session_state.history.extend([
@@ -267,6 +281,7 @@ with tab_tests:
     for filename, label in (
         ("eval_base.json", "Base/public"),
         ("eval_group.json", "Group mandatory"),
+        ("eval_attack_15.json", "Cross-version attack 15"),
         ("eval_security.json", "Security hidden-like"),
         ("eval_research_extension.json", "Optional extension"),
     ):

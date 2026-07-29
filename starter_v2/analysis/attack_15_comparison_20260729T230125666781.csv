@@ -1,0 +1,4 @@
+﻿version,artifact_version,total_cases,measured_cases,provider_error_cases,passed_cases,case_accuracy,multiturn_accuracy,run_file
+v0,v0+pc4656d3cd657+t912d180c0aed,15,15,0,8,0.5333,0.25,D:\DEV\Project\AI_THUC_CHIEN\LAB\NGAY4\agentday4\starter_v2\runs\comparisons\attack_15_20260729T230125666781\v0.json
+v1,v1+pfafa7614b53b+tf4c1024aef73,15,13,2,8,0.6154,0.25,D:\DEV\Project\AI_THUC_CHIEN\LAB\NGAY4\agentday4\starter_v2\runs\comparisons\attack_15_20260729T230125666781\v1.json
+v2,v2+p6fad2c3accff+taabb9267e436,15,15,0,15,1.0,1.0,D:\DEV\Project\AI_THUC_CHIEN\LAB\NGAY4\agentday4\starter_v2\runs\comparisons\attack_15_20260729T230125666781\v2.json

@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
 from providers.base import Provider, ToolCall
-from security import blocked_response, inspect_request, sanitize_tool_result, validate_tool_call
+from security import (
+    blocked_response,
+    inspect_request,
+    sanitize_tool_result,
+    validate_tool_call,
+    validate_tool_result,
+)
 from tools import TOOL_FUNCTIONS
 
 
@@ -41,7 +48,14 @@ class ResearchAgent:
         if not decision.allowed:
             return AgentRun(text=blocked_response(decision), security=security)
 
-        messages = [{"role": "system", "content": self.system_prompt}, *user_messages]
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {
+                "role": "system",
+                "content": f"RUNTIME_CONTEXT: current_date={date.today().isoformat()}.",
+            },
+            *user_messages,
+        ]
         response = self.provider.complete(
             messages,
             self.tools,
@@ -66,7 +80,24 @@ class ResearchAgent:
             try:
                 result = func(**call.args)
             except Exception as exc:  # keep eval robust; failures are evidence
-                result = {"error": type(exc).__name__, "message": str(exc)}
+                result = {
+                    "tool": call.name,
+                    "ok": False,
+                    "contract_version": "ver2",
+                    "error": {"code": type(exc).__name__, "message": str(exc), "retryable": False},
+                }
+            valid_result, result_errors = validate_tool_result(call.name, result)
+            if not valid_result:
+                result = {
+                    "tool": call.name,
+                    "ok": False,
+                    "contract_version": "ver2",
+                    "error": {
+                        "code": "invalid_tool_output",
+                        "message": ", ".join(result_errors),
+                        "retryable": False,
+                    },
+                }
             results.append({
                 "tool": call.name,
                 "args": call.args,
