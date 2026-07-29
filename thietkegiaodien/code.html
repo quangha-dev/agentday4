@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LexFlow - Chatbot Agent</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#283044",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f2f3ff",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "primary-fixed": "#dbe1ff",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#d2d9f4",
+                        "on-tertiary-container": "#bdffdb",
+                        "tertiary": "#006242",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed": "#171c1f",
+                        "surface": "#faf8ff",
+                        "outline-variant": "#c3c6d7",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#6ffbbe",
+                        "surface-tint": "#0053db",
+                        "surface-container-highest": "#dae2fd",
+                        "secondary-fixed-dim": "#c3c7cb",
+                        "on-primary-fixed": "#00174b",
+                        "background": "#faf8ff",
+                        "on-secondary-fixed-variant": "#43474b",
+                        "tertiary-container": "#007d55",
+                        "on-surface-variant": "#434655",
+                        "on-secondary-container": "#5e6367",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#dfe3e7",
+                        "primary-container": "#2563eb",
+                        "secondary": "#5a5f62",
+                        "on-surface": "#131b2e",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-bright": "#faf8ff",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-background": "#131b2e",
+                        "outline": "#737686",
+                        "on-error": "#ffffff",
+                        "primary": "#004ac6",
+                        "on-error-container": "#93000a",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-primary-container": "#eeefff",
+                        "on-tertiary": "#ffffff",
+                        "secondary-container": "#dce0e4",
+                        "on-tertiary-fixed": "#002113",
+                        "surface-container-high": "#e2e7ff",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "surface-variant": "#dae2fd",
+                        "surface-container": "#eaedff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "gutter": "24px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "container-max-width": "1440px",
+                        "margin-desktop": "32px"
+                    },
+                    fontFamily: {
+                        "label-sm": ["Inter"],
+                        "headline-xl": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    fontSize: {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-xl": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: transparent; }
+        .sidebar-transition { transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1), width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        .main-transition { transition: margin-left 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        .animation-delay-100 { animation-delay: 100ms; }
+        .animation-delay-200 { animation-delay: 200ms; }
+        
+        .chat-container-transition {
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .chat-input-wrapper-transition {
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="text-on-background font-body-md h-screen overflow-hidden flex flex-col bg-transparent">
+<canvas class="fixed inset-0 w-full h-full -z-10 pointer-events-none" id="webgl-canvas"></canvas>
+<!-- Top App Bar -->
+<header class="w-full h-16 flex items-center justify-between px-gutter border-b border-outline-variant bg-surface/80 backdrop-blur-md shrink-0 z-30 relative">
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-surface-container-high/80 transition-colors duration-200 text-primary" id="sidebarToggle">
+<span class="material-symbols-outlined" id="sidebarIcon">menu</span>
+</button>
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded bg-primary-container text-on-primary-container flex items-center justify-center font-bold">L</div>
+<div>
+<h1 class="font-headline-sm text-headline-sm font-black text-primary leading-tight">LexFlow</h1>
+<span class="font-label-sm text-label-sm text-on-surface-variant tracking-wider uppercase text-[10px]">Legal Intelligence</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-container-high/80 text-primary hover:bg-surface-variant/80 transition-colors">
+<span class="material-symbols-outlined text-[18px]">wifi_tethering</span>
+<span class="font-label-md text-label-md">API độc lập</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden relative">
+<!-- Collapsible Sidebar -->
+<aside class="absolute inset-y-0 left-0 w-64 bg-surface-container-lowest/80 backdrop-blur-md border-r border-outline-variant transform -translate-x-full sidebar-transition z-20 flex flex-col shadow-lg md:relative md:translate-x-0 md:shadow-none duration-[1000ms] ease-[cubic-bezier(0.4,0,0.2,1)]" id="sidebar">
+<div class="p-4 flex-1">
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-primary bg-surface-container-high/80 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_comment</span>
+<span class="font-label-md text-label-md">Hỏi đáp mới</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high/80 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">Lịch sử hội thoại</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high/80 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">local_library</span>
+<span class="font-label-md text-label-md">Thư viện văn bản</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high/80 transition-colors duration-200 mt-8" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Cài đặt</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Chat Area -->
+<main class="flex-1 flex flex-col relative h-full main-transition duration-[1000ms] ease-[cubic-bezier(0.4,0,0.2,1)]" id="mainContent">
+<div class="flex-1 flex flex-col w-full h-full relative" id="chatContainer">
+<!-- Chat History Area (Initially Hidden) -->
+<div class="absolute inset-0 overflow-y-auto p-8 w-full max-w-4xl mx-auto space-y-6 pb-40 opacity-0 transition-opacity duration-[1500ms] ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none z-0" id="chatHistory">
+<!-- User Prompt -->
+<div class="flex justify-end">
+<div class="bg-primary/90 backdrop-blur-sm text-on-primary rounded-2xl rounded-tr-sm px-5 py-3 max-w-[80%] shadow-sm">
+<p class="font-body-md text-body-md">Quy định về hợp đồng lao động mới nhất như thế nào?</p>
+</div>
+</div>
+<!-- AI Response -->
+<div class="flex justify-start">
+<div class="flex gap-4 max-w-[85%]">
+<div class="w-8 h-8 rounded bg-primary-container text-on-primary-container flex items-center justify-center font-bold shrink-0 mt-1">L</div>
+<div class="bg-surface-container-low/80 backdrop-blur-sm text-on-surface rounded-2xl rounded-tl-sm px-6 py-4 border border-outline-variant shadow-sm space-y-4">
+<p class="font-body-md text-body-md">
+                        Dựa trên <strong>Bộ luật Lao động 2019</strong> (có hiệu lực từ 01/01/2021), quy định về hợp đồng lao động có một số điểm chính như sau:
+                    </p>
+<ul class="list-disc pl-5 font-body-md text-body-md space-y-2 text-on-surface-variant">
+<li class="">Chỉ còn 2 loại hợp đồng lao động: Hợp đồng không xác định thời hạn và Hợp đồng xác định thời hạn (tối đa 36 tháng).</li>
+<li class="">Chấp nhận hợp đồng lao động thông qua phương tiện điện tử dưới hình thức thông điệp dữ liệu (có giá trị như hợp đồng văn bản).</li>
+<li class="">Không được áp dụng thời gian thử việc đối với hợp đồng lao động dưới 01 tháng.</li>
+</ul>
+<div class="mt-4 pt-3 border-t border-outline-variant flex gap-2">
+<button class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-highest/80 text-primary font-label-sm text-label-sm text-xs hover:bg-surface-variant/80 transition-colors">
+<span class="material-symbols-outlined text-[14px]">menu_book</span>
+                            Bộ luật Lao động 2019
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Input Area Wrapper -->
+<div class="absolute inset-0 flex flex-col items-center justify-center p-8 w-full chat-input-wrapper-transition z-10 duration-[1500ms] ease-[cubic-bezier(0.4,0,0.2,1)]" id="inputWrapper">
+<div class="w-full max-w-4xl mx-auto flex flex-col items-center">
+<!-- Greeting -->
+<h2 class="font-headline-xl text-headline-xl text-primary mb-12 text-center transition-all duration-[1500ms] ease-[cubic-bezier(0.4,0,0.2,1)]" id="greeting">
+                Tôi có thể giúp gì cho bạn?
+            </h2>
+<!-- Input Field -->
+<div class="w-full relative group mb-8 transition-all duration-[1500ms] ease-[cubic-bezier(0.4,0,0.2,1)]" id="inputBox">
+<div class="absolute -inset-0.5 bg-gradient-to-r from-primary to-inverse-primary rounded-xl opacity-20 group-focus-within:opacity-50 blur transition duration-500"></div>
+<div class="relative bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant rounded-xl flex items-end p-2 shadow-[0_4px_24px_rgba(0,0,0,0.04)] focus-within:border-primary focus-within:shadow-md transition-all duration-[1500ms] ease-[cubic-bezier(0.4,0,0.2,1)]">
+<button class="p-2 mb-1 text-outline hover:text-primary transition-colors rounded-lg hover:bg-surface-container-high/80 shrink-0">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<textarea class="flex-1 bg-transparent border-none focus:ring-0 text-body-md font-body-md text-on-surface px-4 py-3 placeholder:text-outline resize-none max-h-32 overflow-y-auto min-h-[48px]" id="chatInput" onkeydown="if(event.key === 'Enter' &amp;&amp; !event.shiftKey) { event.preventDefault(); startChat(); }" placeholder="Nhập câu hỏi pháp lý, tải lên tài liệu hoặc dán văn bản..." rows="1"></textarea>
+<button class="p-2 mb-1 text-on-primary bg-primary rounded-lg hover:bg-on-primary-fixed-variant transition-all duration-300 hover:scale-105 ml-2 shadow-sm shrink-0" onclick="startChat()">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+<!-- Suggestions -->
+<div class="flex flex-wrap justify-center gap-3 transition-all duration-[1500ms] ease-[cubic-bezier(0.4,0,0.2,1)]" id="suggestions">
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-container-lowest/80 backdrop-blur-sm text-secondary hover:bg-surface-container-high/80 hover:text-primary hover:border-primary transition-all duration-300 hover:scale-105 hover:shadow-md font-label-md text-label-md text-sm">
+                    Quy định về hợp đồng lao động
+                </button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-container-lowest/80 backdrop-blur-sm text-secondary hover:bg-surface-container-high/80 hover:text-primary hover:border-primary transition-all duration-300 hover:scale-105 hover:shadow-md font-label-md text-label-md text-sm">
+                    Luật doanh nghiệp mới nhất
+                </button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-container-lowest/80 backdrop-blur-sm text-secondary hover:bg-surface-container-high/80 hover:text-primary hover:border-primary transition-all duration-300 hover:scale-105 hover:shadow-md font-label-md text-label-md text-sm">
+                    Thủ tục đăng ký sở hữu trí tuệ
+                </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarIcon = document.getElementById('sidebarIcon');
+        
+        let isSidebarOpen = true; // Default open for desktop
+
+        if (window.innerWidth < 768) {
+            isSidebarOpen = false;
+            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.add('hidden');
+        }
+
+        sidebarToggle.addEventListener('click', () => {
+            isSidebarOpen = !isSidebarOpen;
+            if (isSidebarOpen) {
+                sidebar.classList.remove('hidden');
+                setTimeout(() => sidebar.classList.remove('-translate-x-full'), 10);
+                sidebarToggle.classList.add('bg-surface-container-high/80', 'text-primary');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                sidebarToggle.classList.remove('bg-surface-container-high/80', 'text-primary');
+                setTimeout(() => {
+                    if(!isSidebarOpen) sidebar.classList.add('hidden');
+                }, 1000); // Wait for transition
+            }
+        });
+
+        function startChat() {
+            const input = document.getElementById('chatInput');
+            if (input.value.trim() === '') input.value = 'Quy định về hợp đồng lao động mới nhất như thế nào?';
+
+            const inputWrapper = document.getElementById('inputWrapper');
+            const greeting = document.getElementById('greeting');
+            const suggestions = document.getElementById('suggestions');
+            const chatHistory = document.getElementById('chatHistory');
+            const inputBox = document.getElementById('inputBox');
+
+            // Move input to bottom
+            inputWrapper.classList.remove('justify-center', 'inset-0');
+            inputWrapper.classList.add('bottom-0', 'top-auto', 'bg-background/80', 'backdrop-blur-md', 'border-t', 'border-outline-variant', 'p-6');
+            
+            // Hide greeting and suggestions
+            greeting.style.opacity = '0';
+            greeting.style.height = '0';
+            greeting.style.margin = '0';
+            greeting.style.overflow = 'hidden';
+            
+            suggestions.style.opacity = '0';
+            suggestions.style.height = '0';
+            suggestions.style.margin = '0';
+            suggestions.style.overflow = 'hidden';
+
+            inputBox.classList.remove('mb-8');
+            inputBox.classList.add('mb-0');
+
+            // Show chat history
+            chatHistory.classList.remove('opacity-0', 'pointer-events-none');
+            chatHistory.classList.add('pointer-events-auto');
+            
+            // Clear input after a tiny delay for realism
+            setTimeout(() => {
+                input.value = '';
+            }, 800);
+        }
+        
+        // WebGL Background Shader Setup
+        (function initWebGL() {
+            const canvas = document.getElementById('webgl-canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) return;
+
+            const resize = () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            };
+            window.addEventListener('resize', resize);
+            resize();
+
+            let mouseX = 0;
+            let mouseY = 0;
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            const vsSource = `
+                attribute vec2 a_position;
+                varying vec2 v_texCoord;
+                void main() {
+                    v_texCoord = a_position * 0.5 + 0.5;
+                    v_texCoord.y = 1.0 - v_texCoord.y;
+                    gl_Position = vec4(a_position, 0.0, 1.0);
+                }
+            `;
+
+            const fsSource = `
+                precision highp float;
+                uniform float u_time;
+                uniform vec2 u_resolution;
+                uniform vec2 u_mouse;
+                varying vec2 v_texCoord;
+
+                void main() {
+                    vec2 uv = v_texCoord;
+                    
+                    // Create organic flowing movement using sine waves
+                    float speed = u_time * 0.2;
+                    
+                    float noise = sin(uv.x * 3.0 + speed) * sin(uv.y * 2.0 - speed * 0.8);
+                    noise += sin(uv.x * 5.0 - speed * 1.2) * cos(uv.y * 4.0 + speed * 0.5) * 0.5;
+                    
+                    // Interaction with mouse
+                    vec2 mouse = u_mouse / u_resolution;
+                    float dist = distance(uv, vec2(mouse.x, 1.0 - mouse.y));
+                    float mouseInfluence = smoothstep(0.4, 0.0, dist) * 0.15;
+                    
+                    // LexFlow Brand Palette Colors
+                    vec3 color1 = vec3(0.98, 0.97, 1.0); // Light surface
+                    vec3 color2 = vec3(0.92, 0.95, 1.0); // Soft blue tint
+                    vec3 color3 = vec3(0.145, 0.388, 0.922); // Brand primary blue
+                    
+                    // Blend colors based on noise and coordinates
+                    vec3 finalColor = mix(color1, color2, uv.y + noise * 0.1);
+                    finalColor = mix(finalColor, color3, (noise * 0.05) + mouseInfluence);
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `;
+
+            const compileShader = (type, source) => {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                return shader;
+            };
+
+            const vertexShader = compileShader(gl.VERTEX_SHADER, vsSource);
+            const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fsSource);
+
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            gl.useProgram(program);
+
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                -1.0, -1.0,
+                 1.0, -1.0,
+                -1.0,  1.0,
+                -1.0,  1.0,
+                 1.0, -1.0,
+                 1.0,  1.0
+            ]), gl.STATIC_DRAW);
+
+            const positionLocation = gl.getAttribLocation(program, "a_position");
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+            const timeLocation = gl.getUniformLocation(program, "u_time");
+            const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+            const mouseLocation = gl.getUniformLocation(program, "u_mouse");
+
+            const startTime = performance.now();
+
+            const render = (now) => {
+                const time = (now - startTime) * 0.001;
+                gl.uniform1f(timeLocation, time);
+                gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+                gl.uniform2f(mouseLocation, mouseX, mouseY);
+
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                requestAnimationFrame(render);
+            };
+            requestAnimationFrame(render);
+        })();
+    </script>
+</body></html>

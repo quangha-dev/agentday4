@@ -1,0 +1,2 @@
+"""Legal OCR backend package."""
+
