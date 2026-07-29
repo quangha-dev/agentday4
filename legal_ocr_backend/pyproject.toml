@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "legal-ocr-backend"
+version = "0.1.0"
+description = "Independent OCR, legal structure extraction and semantic retrieval API"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "sqlalchemy>=2.0,<3",
+  "alembic>=1.14,<2",
+  "pydantic-settings>=2.5,<3",
+  "python-multipart>=0.0.12",
+  "pymupdf>=1.24",
+  "pillow>=10.4",
+  "numpy>=1.26",
+  "opencv-python-headless>=4.10",
+  "pytesseract>=0.3.13",
+  "qdrant-client>=1.12",
+  "psycopg[binary]>=3.2",
+  "openai>=1.60,<3",
+]
+
+[project.optional-dependencies]
+embedding = ["sentence-transformers>=3.2"]
+dev = ["pytest>=8.3", "httpx>=0.27", "ruff>=0.7"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+ignore = [
+  "B008",  # FastAPI dependency injection uses calls in defaults by design.
+  "BLE001", # Workflow boundaries must persist third-party OCR/model errors.
+]
