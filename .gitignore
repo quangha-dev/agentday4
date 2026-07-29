@@ -6,7 +6,7 @@ __pycache__/
 .venv/
 
 # Secrets — never commit real keys
-.env
+starter_v1/.env
 .env.*
 !.env.example
 

@@ -1,0 +1,143 @@
+# Legal Search Agent v1 — tool contracts.
+# These declarations describe the legal backend interface. The starter repo
+# does not contain a production legal corpus or backend adapter.
+tools:
+  - name: legal_rag_search
+    description: "Hybrid legal search using keywords, semantic similarity and metadata. Use for natural-language legal questions or as fallback after an exact provision is not found. A high score alone is never proof; effective status and citation must be checked."
+    parameters:
+      type: object
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: "Focused legal question, conduct or exact reference to locate. Never add a fabricated document number."
+        document_type:
+          type: string
+          description: "Optional document type explicitly known from the request, e.g. nghị định."
+        legal_domain:
+          type: string
+          description: "Optional legal domain supported by the request, e.g. giao thông."
+        target_date:
+          type: string
+          description: "Date on which the rule must apply, formatted YYYY-MM-DD."
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          description: "Maximum candidates. Use 5 unless the user or retry strategy requires otherwise."
+      required: [query, target_date, top_k]
+
+  - name: get_legal_provision
+    description: "Retrieve the exact text and metadata at a known Document–Article–Clause–Point location. Use before semantic search when the user identifies the document and article. document_id may be the repository ID or an official document number accepted by the legal backend. Never invent missing location values."
+    parameters:
+      type: object
+      additionalProperties: false
+      properties:
+        document_id:
+          type: string
+          description: "Exact repository document ID or official document number supplied/resolved from evidence."
+        article:
+          type: string
+          description: "Exact article identifier without adding the word Điều."
+        clause:
+          type: string
+          description: "Exact clause identifier when supplied; omit if the request does not identify a clause."
+        point:
+          type: string
+          description: "Exact point identifier when supplied; omit if the request does not identify a point."
+      required: [document_id, article]
+
+  - name: check_effective_status
+    description: "Check whether a legal document/provision is effective on the target date. Must be called for every document used in a legal conclusion or comparison. Standard statuses: not_yet_effective, effective, partially_effective, expired, replaced, unknown."
+    parameters:
+      type: object
+      additionalProperties: false
+      properties:
+        document_id:
+          type: string
+          description: "Exact document ID returned by legal retrieval."
+        target_date:
+          type: string
+          description: "Target date formatted YYYY-MM-DD; keep it consistent through the answer."
+      required: [document_id, target_date]
+
+  - name: compare_legal_versions
+    description: "Compare the exact old and new legal versions at a known provision and classify added, modified or removed content. Never use two merely similar RAG passages as versions."
+    parameters:
+      type: object
+      additionalProperties: false
+      properties:
+        old_document_id:
+          type: string
+          description: "Verified document ID for the old version."
+        new_document_id:
+          type: string
+          description: "Verified document ID for the new version."
+        article:
+          type: string
+          description: "Exact article shared/mapped across the two versions."
+        clause:
+          type: string
+          description: "Exact clause when applicable."
+        point:
+          type: string
+          description: "Exact point when applicable."
+      required: [old_document_id, new_document_id, article]
+
+  - name: extract_legal_information
+    description: "Extract structured legal facts only from provisions already returned by legal tools. Every populated field must be backed by one or more evidence_ids; absent facts stay null or empty."
+    parameters:
+      type: object
+      additionalProperties: false
+      properties:
+        provisions:
+          type: array
+          minItems: 1
+          description: "Verified provisions with stable citation IDs."
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              citation_id:
+                type: string
+                description: "Stable ID such as CIT_01."
+              content:
+                type: string
+                description: "Exact content returned by a legal retrieval tool."
+            required: [citation_id, content]
+        fields:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: "Only fields needed for the user's question."
+          items:
+            type: string
+            enum: [subject, conduct, rights, obligations, deadline, penalty, exceptions]
+      required: [provisions, fields]
+
+  - name: validate_citation
+    description: "Final evidence gate. Verify that every proposed claim has an existing citation, is supported by its content, applies on target_date and points to a valid legal location. If valid=false, the agent must not present the failed claim as a conclusion."
+    parameters:
+      type: object
+      additionalProperties: false
+      properties:
+        claims:
+          type: array
+          minItems: 1
+          description: "All substantive claims planned for the final answer."
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              claim:
+                type: string
+                description: "One precise proposed claim, without unsupported additions."
+              citation_id:
+                type: string
+                description: "Stable evidence ID that supports this claim."
+            required: [claim, citation_id]
+        target_date:
+          type: string
+          description: "Same target date used for effective-status checks, formatted YYYY-MM-DD."
+      required: [claims, target_date]
