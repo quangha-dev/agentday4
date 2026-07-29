@@ -1,13 +1,12 @@
 ---
 name: clarify
-track: core
+version: ver2
 kind: control
-requires_env: []
-inputs: [question, response_type, options]
-outputs: [question, response_type, options, awaiting_user]
 side_effect: false
 ---
-# clarify
 
-Returns a question to the user and pauses until the next user turn.
-`response_type` is free text, yes/no, or a choice from `options`.
+# clarify ver2
+
+Tạm dừng Agent để hỏi đúng một thông tin chỉ user mới cung cấp/quyết định được. Không dùng nếu có thể resolve hoặc retrieval từ kho.
+
+Input: `question`, `response_type=text|yes_no|choice`, `options` khi choice. Output: `awaiting_user=true` cùng câu hỏi; runtime dừng tool loop đến turn tiếp theo.

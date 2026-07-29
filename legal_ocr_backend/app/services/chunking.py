@@ -14,6 +14,7 @@ class ChunkDraft:
     legal_node_id: str
     chunk_index: int
     text: str
+    embedding_text: str
     metadata: dict
 
     @property
@@ -25,18 +26,19 @@ class ChunkDraft:
         return sha256(self.text.encode("utf-8")).hexdigest()
 
 
-def _document_header(document: Document) -> str:
+def build_embedding_context(document: Document, structural_positions: list[str]) -> str:
     fields = [
-        ("Số ký hiệu", document.document_number),
-        ("Ngày ban hành", document.issued_date.isoformat() if document.issued_date else ""),
-        ("Ngày có hiệu lực", document.effective_date.isoformat() if document.effective_date else ""),
-        ("Loại văn bản", document.document_type),
-        ("Cơ quan ban hành", document.issuing_authority),
-        ("Người ký", document.signer),
-        ("Trích yếu", document.summary),
-        ("Phiên bản", str(document.version_number)),
+        document.document_type,
+        document.document_number,
+        document.title,
+        document.summary,
+        " / ".join(structural_positions),
     ]
-    return "\n".join(f"{label}: {value}" for label, value in fields if value)
+    return "\n".join(str(value).strip() for value in fields if value and str(value).strip())
+
+
+def build_embedding_text(document: Document, text: str, structural_positions: list[str]) -> str:
+    return f"{build_embedding_context(document, structural_positions)}\n\n{text}".strip()
 
 
 def _descendant_blocks(node: LegalNode) -> list[tuple[str, int, int, str]]:
@@ -69,8 +71,7 @@ def _split_oversized(text: str, max_chars: int = MAX_CHARS) -> list[str]:
 
 
 def build_article_chunks(document: Document, article: LegalNode) -> list[ChunkDraft]:
-    """Hierarchy-aware chunks: keep legal units intact, split only at clause/point boundaries."""
-    header = _document_header(document)
+    """ver2 hierarchy chunks with legal text separated from metadata and embedding context."""
     article_heading = "\n".join(
         part for part in (article.full_path, article.title, article.content) if part
     ).strip()
@@ -84,12 +85,12 @@ def build_article_chunks(document: Document, article: LegalNode) -> list[ChunkDr
 
     groups: list[list[tuple[str, int, int, str]]] = []
     current: list[tuple[str, int, int, str]] = []
-    current_size = len(header)
+    current_size = 0
     for block in normalized:
         projected = current_size + len(block[0]) + 2
         if current and projected > MAX_CHARS:
             groups.append(current)
-            current, current_size = [], len(header)
+            current, current_size = [], 0
         current.append(block)
         current_size += len(block[0]) + 2
     if current:
@@ -101,8 +102,10 @@ def build_article_chunks(document: Document, article: LegalNode) -> list[ChunkDr
         page_start = min(item[1] for item in group)
         page_end = max(item[2] for item in group)
         structural_positions = list(dict.fromkeys(item[3] for item in group if item[3]))
-        text = f"{header}\n\nVị trí cấu trúc: {article.full_path}\n\n{body}".strip()
+        text = body.strip()
+        embedding_text = build_embedding_text(document, text, structural_positions)
         metadata = {
+            "contract_version": "ver2",
             "document_id": document.id,
             "document_title": document.title,
             "document_number": document.document_number,
@@ -122,7 +125,7 @@ def build_article_chunks(document: Document, article: LegalNode) -> list[ChunkDr
             "page_start": page_start,
             "page_end": page_end,
             "chunk_index": index,
-            "chunk_strategy": "legal-hierarchy-article-clause-v1",
+            "chunk_strategy": "legal-hierarchy-ver2",
         }
-        drafts.append(ChunkDraft(article.id, index, text, metadata))
+        drafts.append(ChunkDraft(article.id, index, text, embedding_text, metadata))
     return drafts

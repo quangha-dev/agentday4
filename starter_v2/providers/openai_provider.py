@@ -30,14 +30,37 @@ class OpenAIProvider:
         temperature: float = 0.0,
         tool_choice: Any | None = None,
     ) -> ModelResponse:
+        api_key = os.getenv(self.api_key_env)
+        if not api_key:
+            raise RuntimeError(f"Missing API key env var: {self.api_key_env}")
+        return self._complete_with_api_key(
+            api_key,
+            messages,
+            tools,
+            model=model,
+            temperature=temperature,
+            tool_choice=tool_choice,
+        )
+
+    def _complete_with_api_key(
+        self,
+        api_key: str,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        *,
+        model: str | None = None,
+        temperature: float = 0.0,
+        tool_choice: Any | None = None,
+    ) -> ModelResponse:
+        """Execute one request with an explicit key.
+
+        Subclasses such as the Groq provider use this protected seam to rotate
+        credentials without mutating or exposing their values.
+        """
         try:
             from openai import OpenAI
         except ImportError as exc:
             raise RuntimeError("Install live provider dependency first: pip install openai") from exc
-
-        api_key = os.getenv(self.api_key_env)
-        if not api_key:
-            raise RuntimeError(f"Missing API key env var: {self.api_key_env}")
 
         client = OpenAI(api_key=api_key, base_url=self.base_url)
         kwargs: dict[str, Any] = {

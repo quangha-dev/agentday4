@@ -1,4 +1,5 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+export const AGENT_API_BASE = process.env.NEXT_PUBLIC_AGENT_API_URL ?? "http://localhost:8502";
 
 export type DocumentItem = {
   id: string; title: string; original_filename: string; status: string; page_count: number;
@@ -15,7 +16,9 @@ export type LegalMetadata = {
 
 export type PageItem = {
   id: string; document_id: string; page_number: number; classification: string;
+  ocr_engine: string | null; ocr_languages: string | null;
   raw_text: string; cleaned_text: string | null; verified_text: string | null;
+  canonical_text: string;
   confidence: number | null; bounding_boxes: unknown[]; is_verified: boolean; image_url: string | null;
 };
 
@@ -38,8 +41,55 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function agentRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${AGENT_API_BASE}${path}`, init);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? `Agent không khả dụng (${response.status})`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export type AgentToolEvent = {
+  tool: string;
+  args: Record<string, unknown>;
+  result: Record<string, unknown>;
+};
+
+export type AgentChatResult = {
+  status: string;
+  mode?: "agent" | "unavailable";
+  assistant_text: string;
+  tool_events: AgentToolEvent[];
+  artifact_version?: string;
+  requested_version?: "v0" | "v1" | "v2";
+  warning?: string;
+  execution_plan?: Record<string, unknown> | null;
+};
+
+export type SystemReadiness = {
+  contract_version: string;
+  ready: boolean;
+  ocr: {
+    ready: boolean;
+    engine: string;
+    executable: string | null;
+    required_languages: string[];
+    available_languages: string[];
+    error: { code: string; message: string } | null;
+  };
+  embedding: { ready: boolean; model: string; semantic: boolean; vector_size: number; collection: string };
+};
+
 export const api = {
+  chat: (messages: Array<{ role: "user" | "assistant"; content: string }>, artifactVersion: "v0" | "v1" | "v2" = "v2") => agentRequest<AgentChatResult>("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, artifact_version: artifactVersion }),
+  }),
   documents: () => request<DocumentItem[]>("/documents"),
+  document: (id: string) => request<DocumentItem>(`/documents/${id}`),
+  readiness: () => request<SystemReadiness>("/system/readiness"),
   upload: (file: File, metadata: LegalMetadata) => {
     const body = new FormData();
     body.append("file", file);

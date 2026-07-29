@@ -11,6 +11,11 @@ tools/<tool_name>/
 `tools/__init__.py` is the registry. `agent.py`, `chat.py`, and `run_eval.py`
 import `TOOL_FUNCTIONS` from that registry.
 
+Các legal tool dùng chung evidence schema và error envelope trong
+[`LEGAL_TOOL_CONTRACT.md`](LEGAL_TOOL_CONTRACT.md). `legal_rag_search` là tool context duy nhất
+đọc vector DB; các tool legal còn lại exact lookup, kiểm tra metadata, so sánh,
+trích xuất và validation trên cùng citation ID.
+
 ## Frontmatter Fields
 
 Every `TOOL.md` uses the same fields:

@@ -52,3 +52,12 @@ def init_database() -> None:
             for column, definition in additions.items():
                 if column not in existing:
                     connection.execute(text(f"ALTER TABLE documents ADD COLUMN {column} {definition}"))
+        page_existing = {column["name"] for column in inspect(engine).get_columns("document_pages")}
+        page_additions = {
+            "ocr_engine": "VARCHAR(100)",
+            "ocr_languages": "VARCHAR(100)",
+        }
+        with engine.begin() as connection:
+            for column, definition in page_additions.items():
+                if column not in page_existing:
+                    connection.execute(text(f"ALTER TABLE document_pages ADD COLUMN {column} {definition}"))

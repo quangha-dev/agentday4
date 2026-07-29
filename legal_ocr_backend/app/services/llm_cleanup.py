@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+from difflib import SequenceMatcher
+
 from openai import OpenAI
 
 from app.core.config import get_settings
@@ -9,6 +12,27 @@ SYSTEM_INSTRUCTION = """Bạn là bộ lọc hậu xử lý OCR cho văn bản p
 Chỉ loại bỏ ký tự rác, lỗi xuống dòng, khoảng trắng và header/footer lặp vô nghĩa.
 Tuyệt đối không tóm tắt, không diễn giải, không tự bổ sung, không đổi số hiệu Điều/Khoản/Điểm,
 không sửa tên riêng hoặc nội dung quy phạm khi không chắc chắn. Trả về duy nhất văn bản đã làm sạch."""
+
+
+def _protected_tokens(text: str) -> set[str]:
+    return set(
+        re.findall(
+            r"\b(?:Điều|Khoản|Điểm)\s*[\wđĐ]+|\b\d[\d./-]*\b|\b(?:NQ|NĐ|TT|QĐ)-[A-ZĐ]+\b",
+            text,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _preserves_legal_content(source: str, candidate: str) -> bool:
+    if not candidate or len(candidate) < max(30, int(len(source) * 0.8)):
+        return False
+    source_tokens = {item.casefold() for item in _protected_tokens(source)}
+    candidate_tokens = {item.casefold() for item in _protected_tokens(candidate)}
+    if not source_tokens.issubset(candidate_tokens):
+        return False
+    similarity = SequenceMatcher(None, " ".join(source.split()), " ".join(candidate.split())).ratio()
+    return similarity >= 0.72
 
 
 def clean_with_llm(raw_text: str) -> tuple[str, str, str | None]:
@@ -31,9 +55,8 @@ def clean_with_llm(raw_text: str) -> tuple[str, str, str | None]:
             ],
         )
         cleaned = (response.choices[0].message.content or "").strip()
-        if not cleaned or len(cleaned) < max(30, int(len(deterministic) * 0.65)):
+        if not _preserves_legal_content(deterministic, cleaned):
             return deterministic, "deterministic-fallback", "Kết quả LLM không đạt kiểm tra bảo toàn nội dung."
         return cleaned, f"llm:{provider}", None
     except Exception:
         return deterministic, "deterministic-fallback", "LLM không khả dụng; đã dùng bộ lọc quy tắc an toàn."
-

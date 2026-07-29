@@ -1,0 +1,2 @@
+﻿version,artifact_version,total_cases,measured_cases,provider_error_cases,passed_cases,case_accuracy,multiturn_accuracy,run_file
+v2,v2+pf398ee3a7b79+td0d355595c53,5,5,0,5,1.0,,D:\DEV\Project\AI_THUC_CHIEN\LAB\NGAY4\agentday4\starter_v2\runs\comparisons\attack_15_20260729T223054279597\v2.json

@@ -31,9 +31,12 @@ class PageOut(BaseModel):
     document_id: str
     page_number: int
     classification: str
+    ocr_engine: str | None
+    ocr_languages: str | None
     raw_text: str
     cleaned_text: str | None
     verified_text: str | None
+    canonical_text: str
     confidence: float | None
     bounding_boxes: list[Any]
     is_verified: bool
@@ -99,3 +102,62 @@ class SearchResult(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+
+
+class RagSearchRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=2000)
+    document_type: str = "all"
+    legal_domain: str = "all"
+    document_number: str | None = None
+    target_date: date | None = None
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class ResolveDocumentRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    target_date: date | None = None
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class ExactProvisionRequest(BaseModel):
+    document_id: str = Field(min_length=1, max_length=500)
+    article: str = Field(min_length=1, max_length=100)
+    clause: str | None = Field(default=None, max_length=100)
+    point: str | None = Field(default=None, max_length=100)
+
+
+class EffectiveStatusRequest(BaseModel):
+    document_id: str = Field(min_length=1, max_length=500)
+    target_date: date
+    article: str | None = None
+    clause: str | None = None
+    point: str | None = None
+
+
+class CompareLegalRequest(BaseModel):
+    old_document_id: str = Field(min_length=1, max_length=500)
+    new_document_id: str = Field(min_length=1, max_length=500)
+    article: str | None = None
+    clause: str | None = None
+    point: str | None = None
+
+
+class CitationClaim(BaseModel):
+    claim: str = Field(min_length=1, max_length=4000)
+    citation_id: str = Field(min_length=1, max_length=100)
+
+
+class CitationValidationRequest(BaseModel):
+    claims: list[CitationClaim] = Field(min_length=1, max_length=20)
+    target_date: date
+
+
+class CitationExtractionRequest(BaseModel):
+    citation_ids: list[str] = Field(min_length=1, max_length=20)
+    fields: list[str] = Field(
+        default_factory=lambda: [
+            "subject", "conduct", "rights", "obligations", "deadline", "penalty", "exceptions"
+        ],
+        min_length=1,
+        max_length=7,
+    )

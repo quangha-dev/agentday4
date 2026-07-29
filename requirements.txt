@@ -1,0 +1,10 @@
+# LexFlow — one-command Python environment for graders.
+# Run from the repository root:
+#   py -3.11 -m venv .venv
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# Agent/API, model providers, eval runner and Streamlit compatibility UI.
+-r ./starter_v2/requirements.txt
+
+# OCR/JSON/Qdrant backend, multilingual semantic embedding and test tools.
+-e ./legal_ocr_backend[embedding,dev]

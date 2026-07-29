@@ -1,5 +1,48 @@
 # Tool Setup Guide
 
+> Lệnh chạy tích hợp và nộp bài theo đúng thứ tự nằm tại `START-HERE.md`. Phần dưới giữ hướng dẫn chi tiết cho từng provider/tool và Windows.
+
+## LexFlow runtime ver2 (đang hoạt động)
+
+Phần này là cấu hình dùng cho hệ thống tích hợp hiện tại. Các hướng dẫn `starter_v0` bên dưới chỉ còn dùng để tái hiện lịch sử eval của bài lab.
+
+```powershell
+# Backend OCR + JSON + vector
+cd legal_ocr_backend
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[embedding,dev]"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+
+# Agent API (terminal khác)
+cd ..\starter_v2
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+# Với Groq: GROQ_API_KEY=...; AGENT_PROVIDER=groq; AGENT_MODEL=openai/gpt-oss-120b
+# Quota failover: GROQ_API_KEY có thể chứa key1,key2; hoặc thêm GROQ_API_KEY_1, GROQ_API_KEY_2 / GROQ_API_KEYS=key2,key3.
+# OPENROUTER_API_KEY cũng hỗ trợ danh sách dấu phẩy; các giá trị gsk_ được nhận vào Groq pool để tương thích cấu hình cũ.
+# Chỉ 429/quota/rate-limit mới xoay key; 401 phải thay credential.
+# Không ghi đè file .env đã có.
+.\.venv\Scripts\python.exe -m uvicorn api:app --port 8502
+
+# Frontend (terminal khác)
+cd ..\legal_ocr_frontend
+npm install
+npm run dev
+```
+
+Readiness và provider smoke test:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/api/v1/system/readiness
+Invoke-RestMethod 'http://localhost:8502/ready?probe=true'
+cd starter_v2
+.\.venv\Scripts\python.exe scripts/preflight_provider.py --provider groq
+```
+
+PASS khi backend báo `contract_version=ver2`, `ocr.ready=true`, `embedding.semantic=true`; Agent chỉ báo `ready=true` sau khi provider được xác thực thành công. OpenRouter trả `AuthenticationError` nghĩa là key trong `.env` không hợp lệ/hết hiệu lực, không phải lỗi RAG.
+
 Tài liệu này dành cho `starter_v0/`. Tất cả key đặt trong `starter_v0/.env`; không commit, chụp màn hình, hoặc đưa `.env` vào file nộp bài.
 
 Pricing, quota và endpoint có thể thay đổi. Kiểm tra lại trang provider trước mỗi cohort.

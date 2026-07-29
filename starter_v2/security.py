@@ -86,6 +86,28 @@ _EXPLICIT_PROMPT_AUDIT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_LEGAL_SCOPE_RE = re.compile(
+    r"\b(pháp luật|pháp lý|luật|bộ luật|điều luật|điều\s+\d+|khoản\s+\d+|điểm\s+[a-zđ]|"
+    r"nghị định|nghị quyết|thông tư|quyết định|văn bản|hiệu lực|hợp đồng|lao động|doanh nghiệp|"
+    r"quyền|nghĩa vụ|trách nhiệm|xử phạt|mức phạt|thủ tục|khiếu nại|tố cáo|thuế|đất đai|"
+    r"quy chế|quy định|dữ liệu|lưu trữ|sao lưu|phục hồi|sự cố|kiểm toán|truy cập|MOCK-\d+|"
+    r"legal|law|article|clause|regulation|statute|contract)\b",
+    re.IGNORECASE,
+)
+_CAPABILITY_OR_GREETING_RE = re.compile(
+    r"^\s*(xin chào|chào|hello|hi|bạn làm được gì|khả năng của bạn|hướng dẫn sử dụng|trợ lý này|hệ thống này|lexflow)",
+    re.IGNORECASE,
+)
+_ADULT_CONTENT_RE = re.compile(
+    r"\b(18\+|nội dung người lớn|khiêu dâm|porn|pornography|sex video|ảnh nóng|nude)\b",
+    re.IGNORECASE,
+)
+_SOVEREIGNTY_RE = re.compile(
+    r"\b(chủ quyền quốc gia|tranh chấp chủ quyền|hoàng sa|trường sa|biển đông|"
+    r"national sovereignty|territorial sovereignty|territorial dispute|south china sea)\b",
+    re.IGNORECASE,
+)
+
 
 def normalize_untrusted_text(value: str) -> str:
     """Normalize obfuscation without rewriting the user's semantic content."""
@@ -95,7 +117,7 @@ def normalize_untrusted_text(value: str) -> str:
     return normalized.strip()
 
 
-def inspect_request(text: str) -> GuardDecision:
+def inspect_request(text: str, *, enforce_scope: bool = True) -> GuardDecision:
     normalized = normalize_untrusted_text(text)
     reasons: list[str] = []
     categories: list[str] = []
@@ -133,7 +155,7 @@ def inspect_request(text: str) -> GuardDecision:
         )
     )
 
-    if categories and not is_security_analysis:
+    if categories and (enforce_scope or not is_security_analysis):
         return GuardDecision(
             allowed=False,
             action="block_and_explain",
@@ -149,6 +171,35 @@ def inspect_request(text: str) -> GuardDecision:
             risk_level="medium",
             categories=categories,
             reasons=reasons,
+            normalized_text=normalized,
+        )
+    if enforce_scope and _ADULT_CONTENT_RE.search(normalized):
+        return GuardDecision(
+            allowed=False,
+            action="block_adult_content",
+            risk_level="high",
+            categories=["adult_content"],
+            reasons=["Nội dung người lớn nằm ngoài phạm vi của trợ lý pháp luật này."],
+            normalized_text=normalized,
+        )
+    if enforce_scope and _SOVEREIGNTY_RE.search(normalized):
+        return GuardDecision(
+            allowed=False,
+            action="block_sensitive_sovereignty",
+            risk_level="high",
+            categories=["sensitive_sovereignty"],
+            reasons=["Chủ đề chủ quyền quốc gia bị chặn theo chính sách ứng dụng."],
+            normalized_text=normalized,
+        )
+    if enforce_scope and not (
+        _LEGAL_SCOPE_RE.search(normalized) or _CAPABILITY_OR_GREETING_RE.search(normalized)
+    ):
+        return GuardDecision(
+            allowed=False,
+            action="block_out_of_scope",
+            risk_level="low",
+            categories=["out_of_scope"],
+            reasons=["Câu hỏi không thuộc phạm vi tra cứu văn bản pháp luật."],
             normalized_text=normalized,
         )
     return GuardDecision(
@@ -198,7 +249,7 @@ def redact_for_logging(value: Any, *, _key: str = "") -> Any:
 def _neutralize_instruction_lines(text: str) -> str:
     safe_lines: list[str] = []
     for line in redact_secrets(text).splitlines():
-        decision = inspect_request(line)
+        decision = inspect_request(line, enforce_scope=False)
         if not decision.allowed and decision.categories:
             safe_lines.append(
                 "[REDACTED_UNTRUSTED_INSTRUCTION: " + ", ".join(decision.categories) + "]"
@@ -254,6 +305,12 @@ def validate_public_http_url(url: str) -> tuple[bool, str | None]:
 
 
 def blocked_response(decision: GuardDecision) -> str:
+    if "out_of_scope" in decision.categories:
+        return "Tôi chỉ hỗ trợ tra cứu và đối chiếu văn bản pháp luật trong thư viện LexFlow."
+    if "adult_content" in decision.categories:
+        return "Tôi không hỗ trợ nội dung 18+ hoặc nội dung người lớn."
+    if "sensitive_sovereignty" in decision.categories:
+        return "Tôi không trả lời các chủ đề về chủ quyền quốc gia theo chính sách của hệ thống."
     labels = ", ".join(decision.categories) or "unsafe_instruction"
     return (
         "Mình không thể thực hiện chỉ thị này vì nó có dấu hiệu can thiệp vào quy tắc hệ thống "
@@ -278,6 +335,57 @@ def _matches_json_type(value: Any, expected_type: str) -> bool:
     return True
 
 
+def _validate_schema_value(value: Any, schema: dict[str, Any], path: str) -> list[str]:
+    errors: list[str] = []
+    if value is None and schema.get("default", object()) is None:
+        return errors
+    expected_type = schema.get("type")
+    if expected_type and not _matches_json_type(value, expected_type):
+        return [f"wrong_type:{path}:{expected_type}"]
+    if "enum" in schema and value not in schema["enum"]:
+        errors.append(f"invalid_enum:{path}")
+    if isinstance(value, str):
+        minimum = int(schema.get("minLength", 0))
+        maximum = min(int(schema.get("maxLength", MAX_USER_CHARS)), MAX_TOOL_TEXT_CHARS)
+        if len(value) < minimum:
+            errors.append(f"below_min_length:{path}")
+        if len(value) > maximum:
+            errors.append(f"above_max_length:{path}")
+        if schema.get("format") == "date" and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            errors.append(f"invalid_date:{path}")
+    if isinstance(value, int) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            errors.append(f"below_minimum:{path}")
+        if "maximum" in schema and value > schema["maximum"]:
+            errors.append(f"above_maximum:{path}")
+    if isinstance(value, list):
+        if len(value) < int(schema.get("minItems", 0)):
+            errors.append(f"below_min_items:{path}")
+        if len(value) > int(schema.get("maxItems", 100)):
+            errors.append(f"above_max_items:{path}")
+        if schema.get("uniqueItems"):
+            serialized = [repr(item) for item in value]
+            if len(serialized) != len(set(serialized)):
+                errors.append(f"duplicate_items:{path}")
+        item_schema = schema.get("items") or {}
+        for index, item in enumerate(value):
+            errors.extend(_validate_schema_value(item, item_schema, f"{path}[{index}]"))
+    if isinstance(value, dict):
+        properties = schema.get("properties") or {}
+        required = schema.get("required") or []
+        if schema.get("additionalProperties") is False:
+            unknown = sorted(set(value) - set(properties))
+            if unknown:
+                errors.append(f"unknown_arguments:{path}:" + ",".join(unknown))
+        for key in required:
+            if key not in value:
+                errors.append(f"missing_required:{path}.{key}")
+        for key, child in value.items():
+            if key in properties:
+                errors.extend(_validate_schema_value(child, properties[key], f"{path}.{key}"))
+    return errors
+
+
 def validate_tool_call(
     name: str,
     args: dict[str, Any],
@@ -296,33 +404,8 @@ def validate_tool_call(
         return False, ["arguments_must_be_object"]
 
     schema = declaration.get("parameters") or {}
-    properties = schema.get("properties") or {}
-    required = schema.get("required") or []
-    errors: list[str] = []
-
-    unknown = sorted(set(args) - set(properties))
-    if unknown:
-        errors.append("unknown_arguments:" + ",".join(unknown))
-    for key in required:
-        if key not in args:
-            errors.append(f"missing_required:{key}")
-    for key, value in args.items():
-        prop = properties.get(key)
-        if not prop:
-            continue
-        expected_type = prop.get("type")
-        if expected_type and not _matches_json_type(value, expected_type):
-            errors.append(f"wrong_type:{key}:{expected_type}")
-            continue
-        if "enum" in prop and value not in prop["enum"]:
-            errors.append(f"invalid_enum:{key}")
-        if isinstance(value, int) and not isinstance(value, bool):
-            if "minimum" in prop and value < prop["minimum"]:
-                errors.append(f"below_minimum:{key}")
-            if "maximum" in prop and value > prop["maximum"]:
-                errors.append(f"above_maximum:{key}")
-        if isinstance(value, str) and len(value) > 8_000:
-            errors.append(f"argument_too_long:{key}")
+    schema = {**schema, "additionalProperties": False}
+    errors = _validate_schema_value(args, schema, "args")
 
     if name == "fetch" and isinstance(args.get("url"), str):
         ok, reason = validate_public_http_url(args["url"])
@@ -331,4 +414,20 @@ def validate_tool_call(
     if name == "send" and args.get("confirmed") is not True:
         errors.append("send_requires_explicit_confirmation")
 
+    return not errors, errors
+
+
+def validate_tool_result(name: str, result: Any) -> tuple[bool, list[str]]:
+    """Validate the common ver2 output envelope before returning data to the model."""
+    if not isinstance(result, dict):
+        return False, ["tool_result_must_be_object"]
+    errors: list[str] = []
+    if result.get("tool") != name:
+        errors.append("tool_result_name_mismatch")
+    if not isinstance(result.get("ok"), bool):
+        errors.append("tool_result_missing_ok")
+    if result.get("contract_version") != "ver2":
+        errors.append("tool_result_contract_not_ver2")
+    if result.get("ok") is False and not isinstance(result.get("error"), (dict, list)):
+        errors.append("tool_error_envelope_missing")
     return not errors, errors

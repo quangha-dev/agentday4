@@ -18,7 +18,7 @@ load_lab_env(ROOT)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Smoke-test live structured tool calling.")
-    parser.add_argument("--provider", choices=["openrouter", "openai", "anthropic", "gemini"], required=True)
+    parser.add_argument("--provider", choices=["openrouter", "openai", "anthropic", "gemini", "groq"], required=True)
     parser.add_argument("--model", default=None, help="Optional model override. Omit to use provider default from code.")
     parser.add_argument("--tools", type=Path, default=ARTIFACTS_DIR / "tools.yaml")
     args = parser.parse_args()
@@ -26,15 +26,19 @@ def main() -> None:
     provider = make_provider(args.provider)
     tools = to_openai_tools(load_tool_declarations(args.tools))
     messages = [
-        {"role": "system", "content": "You are a tool-routing smoke test. Use tools when appropriate."},
-        {"role": "user", "content": "Tweet mới nhất của Sam Altman là gì?"},
+        {"role": "system", "content": "You are the LexFlow ver2 tool-routing smoke test. Use one declared legal tool."},
+        {"role": "user", "content": "Tra cứu quy định về quyền của người lao động."},
     ]
     response = provider.complete(messages, tools, model=args.model, temperature=0.0)
     if not response.tool_calls:
         raise SystemExit("Provider did not return structured tool_calls.")
     first = response.tool_calls[0]
+    if first.name not in {"legal_rag_search", "resolve_legal_document"}:
+        raise SystemExit(f"Provider selected an unexpected ver2 tool: {first.name}")
     selected_model = args.model or getattr(provider, "default_model", None)
     print(f"OK provider={args.provider} model={selected_model}")
+    if hasattr(provider, "key_count"):
+        print(f"key_pool_size={provider.key_count}")
     print(f"tool={first.name}")
     print(f"args={first.args}")
 

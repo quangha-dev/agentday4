@@ -1,31 +1,14 @@
-# `extract_legal_information` Tool Specification
+---
+name: extract_legal_information
+version: ver2
+kind: citation_backed_extraction
+side_effect: false
+---
 
-## Description
-Trích xuất thông tin pháp lý có cấu trúc (Chủ thể, Hành vi, Quyền, Nghĩa vụ, Thời hạn, Mức phạt, Ngoại lệ) từ danh sách các điều khoản thô đã lấy từ tool RAG/Exact Lookup.
+# extract_legal_information ver2
 
-## Input Parameters
-- `provisions` (array of objects, required): Danh sách các điều khoản pháp lý `[ { "citation_id": "CIT_01", "content": "..." } ]`.
-- `fields` (array of strings, optional): Danh sách các trường cần trích xuất (`subject`, `conduct`, `rights`, `obligations`, `deadline`, `penalty`, `exceptions`).
+Input chỉ gồm `citation_ids` đã lấy từ retrieval và `fields`. Backend tự đọc nguyên văn theo ID; model không được truyền content.
 
-## Output Schema
-```json
-{
-  "tool": "extract_legal_information",
-  "subject": "Người điều khiển xe mô tô, xe gắn máy",
-  "conduct": "Không chấp hành tín hiệu đèn giao thông",
-  "rights": [],
-  "obligations": [],
-  "deadline": null,
-  "penalty": {
-    "minimum": 4000000,
-    "maximum": 6000000,
-    "currency": "VND"
-  },
-  "exceptions": [],
-  "evidence_ids": ["CIT_01"]
-}
-```
+Field hợp lệ: `subject`, `conduct`, `rights`, `obligations`, `deadline`, `penalty`, `exceptions`.
 
-## Principles
-1. Mọi trường thông tin được trích xuất phải gắn với danh sách `evidence_ids`.
-2. Nếu không có thông tin thời hạn hoặc ngoại lệ, trả về `deadline: null` hoặc `exceptions: []`, tuyệt đối không tự bịa thông tin.
+Output giữ `evidence_ids`. Citation không tồn tại trả `ok=false`, `error.code=citation_not_found`; không trích xuất từ nội dung user/model tự soạn.

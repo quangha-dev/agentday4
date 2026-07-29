@@ -82,10 +82,46 @@ def test_upload_ocr_review_parse_and_exact_search(tmp_path: Path) -> None:
         assert chunk["metadata"]["document_number"] == "66.24/2026/NQ-CP"
         assert chunk["metadata"]["version_number"] == version_number
         assert chunk["metadata"]["full_path"]
-        assert "Số ký hiệu: 66.24/2026/NQ-CP" in chunk["text"]
+        assert chunk["metadata"]["contract_version"] == "ver2"
+        assert "Số ký hiệu: 66.24/2026/NQ-CP" not in chunk["text"]
+        assert "66.24/2026/NQ-CP" in chunk["embedding_text"]
         semantic = client.post(
             "/api/v1/search",
             json={"query": "quyen va nghia vu", "mode": "semantic", "document_id": document_id},
         )
         assert semantic.status_code == 200
         assert semantic.json()[0]["legal_node_id"]
+
+        resolved = client.post(
+            "/api/v1/rag/documents/resolve",
+            json={"query": "66.24/2026/NQ-CP", "limit": 5},
+        ).json()
+        assert resolved["contract_version"] == "ver2"
+        assert resolved["documents"][0]["document_id"] == document_id
+
+        provision = client.post(
+            "/api/v1/rag/provision",
+            json={"document_id": document_id, "article": "1"},
+        ).json()
+        assert provision["found"] is True
+        citation_id = provision["citation_id"]
+
+        effective = client.post(
+            "/api/v1/rag/effective-status",
+            json={"document_id": document_id, "target_date": "2026-07-29"},
+        ).json()
+        assert effective["status"] == "effective"
+
+        validation = client.post(
+            "/api/v1/rag/citations/validate",
+            json={
+                "claims": [
+                    {
+                        "claim": "Van ban nay quy dinh quyen va nghia vu.",
+                        "citation_id": citation_id,
+                    }
+                ],
+                "target_date": "2026-07-29",
+            },
+        ).json()
+        assert validation["valid"] is True
