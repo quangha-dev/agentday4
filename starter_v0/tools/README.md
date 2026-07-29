@@ -19,7 +19,7 @@ Every `TOOL.md` uses the same fields:
 ---
 name: tool_name
 track: core | bonus
-kind: live_api | local_formatter | local_knowledge | action | control
+kind: live_api | local_formatter | local_knowledge | local_security | action | control
 provider: Provider name if any
 requires_env: [ENV_VAR]
 inputs: [arg_name]

@@ -6,13 +6,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from security import redact_secrets
+
 
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT = 30
 
 
 def err(tool: str, exc: Exception) -> dict[str, Any]:
-    return {"tool": tool, "error": type(exc).__name__, "message": str(exc)}
+    return {"tool": tool, "error": type(exc).__name__, "message": redact_secrets(str(exc))}
 
 
 def domain(url: str) -> str:

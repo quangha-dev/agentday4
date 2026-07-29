@@ -295,9 +295,11 @@ def main() -> None:
             calls = [{"name": call.name, "args": call.args} for call in run.tool_calls]
             result = evaluate_phase_b(case, calls, run.text)
             tool_results = run.tool_results
+            security = run.security
         except Exception as exc:
             calls = []
             tool_results = []
+            security = {}
             result = {
                 "passed": False,
                 "failure_type": "provider_error",
@@ -320,6 +322,7 @@ def main() -> None:
             "expect": case["expect"],
             "result": result,
             "tool_results": tool_results,
+            "security": security,
         })
 
     summary = summarize(results)

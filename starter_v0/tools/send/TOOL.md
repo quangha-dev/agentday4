@@ -7,6 +7,7 @@ requires_env: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]
 inputs: [text, confirmed]
 outputs: [status]
 side_effect: true
+requires_confirmation: true
 ---
 # send
 
